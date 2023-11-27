@@ -188,6 +188,20 @@ func findDups(vals []string) sets.String {
 type Param struct {
 	Name  string     `json:"name"`
 	Value ParamValue `json:"value"`
+
+	// Source for the environment variable's value. Cannot be used if value is not empty.
+	// +optional
+	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
+}
+
+// EnvVarSource represents a source for the value of an EnvVar.
+type EnvVarSource struct {
+	// Selects a key of a ConfigMap.
+	// +optional
+	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`
+	// Selects a key of a secret in the pod's namespace
+	// +optional
+	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty" protobuf:"bytes,4,opt,name=secretKeyRef"`
 }
 
 // GetVarSubstitutionExpressions extracts all the value between "$(" and ")"" for a Parameter

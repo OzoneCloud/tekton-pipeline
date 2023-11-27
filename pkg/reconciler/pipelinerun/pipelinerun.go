@@ -229,7 +229,10 @@ func (c *Reconciler) ReconcileKind(ctx context.Context, pr *v1.PipelineRun) pkgr
 	if err != nil {
 		return fmt.Errorf("failed to list VerificationPolicies from namespace %s with error %w", pr.Namespace, err)
 	}
-	getPipelineFunc := resources.GetPipelineFunc(ctx, c.KubeClientSet, c.PipelineClientSet, c.resolutionRequester, pr, vp)
+	getPipelineFunc, err := resources.GetPipelineFunc(ctx, c.KubeClientSet, c.PipelineClientSet, c.resolutionRequester, pr, vp)
+	if err != nil {
+		return fmt.Errorf("failed to get getPipelineFunc error %w", err)
+	}
 
 	if pr.IsDone() {
 		pr.SetDefaults(ctx)
@@ -522,7 +525,13 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1.PipelineRun, getPipel
 	}
 
 	// Apply parameter substitution from the PipelineRun
-	pipelineSpec = resources.ApplyParameters(ctx, pipelineSpec, pr)
+	pipelineSpec, err = resources.ApplyParameters(ctx, c.KubeClientSet, pipelineSpec, pr)
+	if err != nil {
+		pr.Status.MarkFailed(v1.PipelineRunReasonInvalidTaskRunSpec.String(),
+			"failed to generate pipelinespec with error %w", err)
+		return controller.NewPermanentError(err)
+	}
+
 	pipelineSpec = resources.ApplyContexts(pipelineSpec, pipelineMeta.Name, pr)
 	pipelineSpec = resources.ApplyWorkspaces(pipelineSpec, pr)
 	// Update pipelinespec of pipelinerun's status field

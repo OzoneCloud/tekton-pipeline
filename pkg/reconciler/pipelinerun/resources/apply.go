@@ -22,6 +22,12 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/client-go/kubernetes"
+
+	corev1 "k8s.io/api/core/v1"
+	// "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
@@ -47,7 +53,7 @@ var (
 )
 
 // ApplyParameters applies the params from a PipelineRun.Params to a PipelineSpec.
-func ApplyParameters(ctx context.Context, p *v1.PipelineSpec, pr *v1.PipelineRun) *v1.PipelineSpec {
+func ApplyParameters(ctx context.Context, kubeClientSet kubernetes.Interface, p *v1.PipelineSpec, pr *v1.PipelineRun) (*v1.PipelineSpec, error) {
 	// This assumes that the PipelineRun inputs have been validated against what the Pipeline requests.
 
 	// stringReplacements is used for standard single-string stringReplacements,
@@ -84,8 +90,10 @@ func ApplyParameters(ctx context.Context, p *v1.PipelineSpec, pr *v1.PipelineRun
 		}
 	}
 	// Set and overwrite params with the ones from the PipelineRun
-	prStrings, prArrays, prObjects := paramsFromPipelineRun(ctx, pr)
-
+	prStrings, prArrays, prObjects, err := paramsFromPipelineRun(ctx, kubeClientSet, pr)
+	if err != nil {
+		return nil, err
+	}
 	for k, v := range prStrings {
 		stringReplacements[k] = v
 	}
@@ -96,15 +104,19 @@ func ApplyParameters(ctx context.Context, p *v1.PipelineSpec, pr *v1.PipelineRun
 		objectReplacements[k] = v
 	}
 
-	return ApplyReplacements(p, stringReplacements, arrayReplacements, objectReplacements)
+	return ApplyReplacements(p, stringReplacements, arrayReplacements, objectReplacements), nil
 }
 
-func paramsFromPipelineRun(ctx context.Context, pr *v1.PipelineRun) (map[string]string, map[string][]string, map[string]map[string]string) {
+func paramsFromPipelineRun(ctx context.Context, kubeClientSet kubernetes.Interface, pr *v1.PipelineRun) (map[string]string, map[string][]string, map[string]map[string]string, error) {
 	// stringReplacements is used for standard single-string stringReplacements,
 	// while arrayReplacements/objectReplacements contains arrays/objects that need to be further processed.
 	stringReplacements := map[string]string{}
 	arrayReplacements := map[string][]string{}
 	objectReplacements := map[string]map[string]string{}
+	var (
+		configMaps = make(map[string]*corev1.ConfigMap)
+		secrets    = make(map[string]*corev1.Secret)
+	)
 
 	for _, p := range pr.Spec.Params {
 		switch p.Value.Type {
@@ -125,13 +137,72 @@ func paramsFromPipelineRun(ctx context.Context, pr *v1.PipelineRun) (map[string]
 		case v1.ParamTypeString:
 			fallthrough
 		default:
+			runtimeVal := p.Value.StringVal
+			if p.ValueFrom != nil {
+				var err error
+				switch {
+
+				case p.ValueFrom.ConfigMapKeyRef != nil:
+					cm := p.ValueFrom.ConfigMapKeyRef
+					name := cm.Name
+					key := cm.Key
+					optional := cm.Optional != nil && *cm.Optional
+					configMap, ok := configMaps[name]
+					if !ok {
+						if kubeClientSet == nil {
+							return nil, nil, nil, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pr.Namespace, name)
+						}
+						configMap, err = kubeClientSet.CoreV1().ConfigMaps(pr.Namespace).Get(ctx, name, metav1.GetOptions{})
+						if err != nil {
+							return nil, nil, nil, err
+						}
+						configMaps[name] = configMap
+					}
+					runtimeVal, ok = configMap.Data[key]
+					if !ok {
+						if optional {
+							continue
+						}
+						return nil, nil, nil, fmt.Errorf("couldn't find key %v in ConfigMap %v/%v", key, pr.Namespace, name)
+					}
+				case p.ValueFrom.SecretKeyRef != nil:
+					s := p.ValueFrom.SecretKeyRef
+					name := s.Name
+					key := s.Key
+					optional := s.Optional != nil && *s.Optional
+					secret, ok := secrets[name]
+					if !ok {
+						if kubeClientSet == nil {
+							return nil, nil, nil, fmt.Errorf("couldn't get secret %v/%v, no kubeClient defined", pr.Namespace, name)
+						}
+						secret, err = kubeClientSet.CoreV1().Secrets(pr.Namespace).Get(ctx, name, metav1.GetOptions{})
+						if err != nil {
+							return nil, nil, nil, err
+						}
+						secrets[name] = secret
+					}
+					fmt.Println("1", secret)
+					fmt.Println("2", key)
+
+					runtimeValBytes, ok := secret.Data[key]
+					if !ok {
+						if optional {
+							continue
+						}
+						return nil, nil, nil, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pr.Namespace, name)
+					}
+					runtimeVal = string(runtimeValBytes)
+				}
+
+			}
+
 			for _, pattern := range paramPatterns {
-				stringReplacements[fmt.Sprintf(pattern, p.Name)] = p.Value.StringVal
+				stringReplacements[fmt.Sprintf(pattern, p.Name)] = runtimeVal
 			}
 		}
 	}
 
-	return stringReplacements, arrayReplacements, objectReplacements
+	return stringReplacements, arrayReplacements, objectReplacements, nil
 }
 
 // GetContextReplacements returns the pipelineRun context which can be used to replace context variables in the specifications

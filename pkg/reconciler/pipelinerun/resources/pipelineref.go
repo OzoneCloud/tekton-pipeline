@@ -40,7 +40,7 @@ import (
 // looks up the pipeline. It uses as context a k8s client, tekton client, namespace, and service account name to return
 // the pipeline. It knows whether it needs to look in the cluster or in a remote location to fetch the reference.
 // OCI bundle and remote resolution pipelines will be verified by trusted resources if the feature is enabled
-func GetPipelineFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset.Interface, requester remoteresource.Requester, pipelineRun *v1.PipelineRun, verificationPolicies []*v1alpha1.VerificationPolicy) rprp.GetPipeline {
+func GetPipelineFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset.Interface, requester remoteresource.Requester, pipelineRun *v1.PipelineRun, verificationPolicies []*v1alpha1.VerificationPolicy) (rprp.GetPipeline, error) {
 	pr := pipelineRun.Spec.PipelineRef
 	namespace := pipelineRun.Namespace
 	// if the spec is already in the status, do not try to fetch it again, just use it as source of truth.
@@ -58,13 +58,17 @@ func GetPipelineFunc(ctx context.Context, k8s kubernetes.Interface, tekton clien
 				},
 				Spec: *pipelineRun.Status.PipelineSpec,
 			}, refSource, nil, nil
-		}
+		}, nil
 	}
 
 	switch {
 	case pr != nil && pr.Resolver != "" && requester != nil:
 		return func(ctx context.Context, name string) (*v1.Pipeline, *v1.RefSource, *trustedresources.VerificationResult, error) {
-			stringReplacements, arrayReplacements, objectReplacements := paramsFromPipelineRun(ctx, pipelineRun)
+			stringReplacements, arrayReplacements, objectReplacements, err := paramsFromPipelineRun(ctx, k8s, pipelineRun)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
 			for k, v := range GetContextReplacements("", pipelineRun) {
 				stringReplacements[k] = v
 			}
@@ -72,14 +76,14 @@ func GetPipelineFunc(ctx context.Context, k8s kubernetes.Interface, tekton clien
 
 			resolver := resolution.NewResolver(requester, pipelineRun, string(pr.Resolver), "", "", replacedParams)
 			return resolvePipeline(ctx, resolver, name, namespace, k8s, tekton, verificationPolicies)
-		}
+		}, nil
 	default:
 		// Even if there is no pipeline ref, we should try to return a local resolver.
 		local := &LocalPipelineRefResolver{
 			Namespace:    namespace,
 			Tektonclient: tekton,
 		}
-		return local.GetPipeline
+		return local.GetPipeline, nil
 	}
 }
 
