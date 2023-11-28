@@ -1,4 +1,4 @@
-module github.com/tektoncd/pipeline
+module github.com/OzoneCloud/tekton-pipeline
 
 go 1.19
 
