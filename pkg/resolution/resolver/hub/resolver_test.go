@@ -19,6 +19,7 @@ package hub
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -28,7 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	pipelinev1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
-	resolutioncommon "github.com/tektoncd/pipeline/pkg/resolution/common"
+	common "github.com/tektoncd/pipeline/pkg/resolution/common"
 	"github.com/tektoncd/pipeline/pkg/resolution/resolver/framework"
 	frtesting "github.com/tektoncd/pipeline/pkg/resolution/resolver/framework/testing"
 	"github.com/tektoncd/pipeline/test/diff"
@@ -37,7 +38,7 @@ import (
 func TestGetSelector(t *testing.T) {
 	resolver := Resolver{}
 	sel := resolver.GetSelector(context.Background())
-	if typ, has := sel[resolutioncommon.LabelKeyResolverType]; !has {
+	if typ, has := sel[common.LabelKeyResolverType]; !has {
 		t.Fatalf("unexpected selector: %v", sel)
 	} else if typ != LabelValueHubResolverType {
 		t.Fatalf("unexpected type: %q", typ)
@@ -61,14 +62,23 @@ func TestValidateParams(t *testing.T) {
 			version:      "bar",
 			catalog:      "baz",
 			hubType:      ArtifactHubType,
-		}, {
+		},
+		{
+			testName:     "stepaction validation",
+			kind:         "stepaction",
+			resourceName: "foo",
+			version:      "bar",
+			catalog:      "baz",
+			hubType:      ArtifactHubType,
+		},
+		{
 			testName:     "tekton type validation",
 			kind:         "task",
 			resourceName: "foo",
 			version:      "bar",
 			catalog:      "baz",
 			hubType:      TektonHubType,
-			expectedErr:  fmt.Errorf("failed to validate params: please configure TEKTON_HUB_API env variable to use tekton type"),
+			expectedErr:  errors.New("failed to validate params: please configure TEKTON_HUB_API env variable to use tekton type"),
 		},
 	}
 
@@ -147,7 +157,7 @@ func TestValidateParamsConflictingKindName(t *testing.T) {
 		hubType string
 	}{
 		{
-			kind:    "not-taskpipeline",
+			kind:    "not-taskpipelineorstepaction",
 			name:    "foo",
 			version: "bar",
 			catalog: "baz",
@@ -301,7 +311,7 @@ func TestResolveConstraint(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: fmt.Errorf("no version found for constraint >= 0.2.0"),
+			expectedErr: errors.New("no version found for constraint >= 0.2.0"),
 		}, {
 			name:     "bad/tekton hub/no matching constraints",
 			kind:     "task",
@@ -318,7 +328,7 @@ func TestResolveConstraint(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: fmt.Errorf("no version found for constraint >= 0.2.0"),
+			expectedErr: errors.New("no version found for constraint >= 0.2.0"),
 		},
 	}
 	for _, tt := range tests {
@@ -345,7 +355,7 @@ func TestResolveConstraint(t *testing.T) {
 					ret = tt.resultTask
 				}
 				output, _ := json.Marshal(ret)
-				fmt.Fprintf(w, string(output))
+				fmt.Fprint(w, string(output))
 			}))
 
 			resolver := &Resolver{
@@ -556,7 +566,7 @@ func TestResolve(t *testing.T) {
 			catalog:     "Tekton",
 			hubType:     TektonHubType,
 			input:       `value`,
-			expectedErr: fmt.Errorf("fail to fetch Tekton Hub resource: error unmarshalling json response: invalid character 'v' looking for beginning of value"),
+			expectedErr: errors.New("fail to fetch Tekton Hub resource: error unmarshalling json response: invalid character 'v' looking for beginning of value"),
 		},
 		{
 			name:        "response with empty body error from Tekton Hub",
@@ -565,7 +575,7 @@ func TestResolve(t *testing.T) {
 			version:     "baz",
 			catalog:     "Tekton",
 			hubType:     TektonHubType,
-			expectedErr: fmt.Errorf("fail to fetch Tekton Hub resource: error unmarshalling json response: unexpected end of JSON input"),
+			expectedErr: errors.New("fail to fetch Tekton Hub resource: error unmarshalling json response: unexpected end of JSON input"),
 		},
 		{
 			name:        "response with empty body error from Artifact Hub",
@@ -574,14 +584,14 @@ func TestResolve(t *testing.T) {
 			version:     "baz",
 			catalog:     "Tekton",
 			hubType:     ArtifactHubType,
-			expectedErr: fmt.Errorf("fail to fetch Artifact Hub resource: error unmarshalling json response: unexpected end of JSON input"),
+			expectedErr: errors.New("fail to fetch Artifact Hub resource: error unmarshalling json response: unexpected end of JSON input"),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Fprintf(w, tc.input)
+				fmt.Fprint(w, tc.input)
 			}))
 
 			resolver := &Resolver{

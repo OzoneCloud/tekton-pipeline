@@ -35,7 +35,7 @@ After reading the developer docs, you may find it useful to return to these `Tek
 -   Install via
     [official installation docs](https://github.com/tektoncd/pipeline/blob/main/docs/install.md)
     or continue through [getting started for development](#getting-started)
--   [Tekton Pipeline "Hello World" tutorial](https://github.com/tektoncd/pipeline/blob/main/docs/tutorial.md) -
+-   [Tekton Pipeline "Hello World" tutorial](https://tekton.dev/docs/getting-started/pipelines) -
     Define `Tasks` and `Pipelines` (i.e., Tekton CRDs), and see what happens when they are run
 
 ---
@@ -55,6 +55,15 @@ GitHub is used for project Source Code Management (SCM) using the SSH protocol f
 You must install these tools:
 
 1. [`git`](https://help.github.com/articles/set-up-git/): For source control
+
+1. [`pre-commit`](https://pre-commit.com/#install): pre-commit generates and runs locally a few checks (as [git-hooks](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks)) to ensure the pushed code is valid. All checks are performed prior to `git push` command.
+
+   ```shell
+   # After install step run pre-commit binary at the root directory in order to install git hooks.
+   pre-commit install
+   # Run the hooks against all of the files
+   pre-commit run --all-files
+   ```
 
 1. [`go`](https://golang.org/doc/install): The language Tekton Pipelines is
     built in.
@@ -87,9 +96,15 @@ You must install these tools:
 1. [`go-licenses`](https://github.com/google/go-licenses) is used in e2e tests.
 
 1. (Optional)
-   [`golangci-lint`](https://golangci-lint.run/usage/install/#local-installation)
+   [`yamllint`](https://github.com/adrienverge/yamllint?tab=readme-ov-file#installation)
+   is run against every PR as part of `pre-commit`. You may want to install this tool
+   so that `pre-commit` can use it, otherwise it will show a `failed` message for
+   when linting yaml files.
+
+1. (Optional)
+   [`golangci-lint`](https://golangci-lint.run/welcome/install/#local-installation)
    is run against every PR. You may want to install and [run this tool
-   locally](https://golangci-lint.run/usage/quick-start) to iterate quickly on
+   locally](https://golangci-lint.run/welcome/quick-start) to iterate quickly on
    linter issues.
 
    > **Note** Linter findings are dependent on your installed Go version. Match
@@ -130,7 +145,7 @@ For example:
 
         ```shell
         # format: ${localhost:port}/{}
-        export KO_DOCKER_REPO=`localhost:5000/mypipelineimages`
+        export KO_DOCKER_REPO='localhost:5000/mypipelineimages'
         ```
 
 1. Optionally, add `$HOME/go/bin` to your system `PATH` so that any tooling installed via `go get` will work properly. For example:
@@ -274,7 +289,7 @@ as follows.
 
 The recommended minimum development configuration is:
 
-- Kubernetes version 1.25 or later
+- Kubernetes version 1.28 or later
 - 4 (virtual) CPU nodes
   - 8 GB of (actual or virtualized) platform memory
 - Node autoscaling, up to 3 nodes
@@ -288,17 +303,24 @@ The recommended minimum development configuration is:
 3. Create cluster:
 
    ```sh
-   $ kind create cluster
+   kind create cluster
    ```
 
 4. Configure [ko](https://kind.sigs.k8s.io/):
 
    ```sh
-   $ export KO_DOCKER_REPO="kind.local"
-   $ export KIND_CLUSTER_NAME="kind"  # only needed if you used a custom name in the previous step
+   export KO_DOCKER_REPO="kind.local"
+   export KIND_CLUSTER_NAME="kind"  # only needed if you used a custom name in the previous step
    ```
 
 optional: As a convenience, the [Tekton plumbing project](https://github.com/tektoncd/plumbing) provides a script named ['tekton_in_kind.sh'](https://github.com/tektoncd/plumbing/tree/main/hack#tekton_in_kindsh) that leverages `kind` to create a cluster and install Tekton Pipeline, [Tekton Triggers](https://github.com/tektoncd/triggers) and [Tekton Dashboard](https://github.com/tektoncd/dashboard) components into it.
+
+If you used the ['tekton_in_kind.sh'](https://github.com/tektoncd/plumbing/tree/main/hack#tekton_in_kindsh) plumbing script to deploy your `kind` cluster, you need to tell `ko` to use the local registry as mentioned [here](#configure-environment).
+
+
+```sh
+export KO_DOCKER_REPO="localhost:5000"
+```
 
 #### Using MiniKube
 
@@ -332,7 +354,7 @@ optional: As a convenience, the [Tekton plumbing project](https://github.com/tek
      --region=us-central1 \
      --machine-type=e2-standard-4 \
      --num-nodes=1 \
-     --cluster-version=1.25
+     --cluster-version=1.28
     ```
 
     > **Note**: The recommended [GCE machine type](https://cloud.google.com/compute/docs/machine-types) is `'e2-standard-4'`.

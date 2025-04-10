@@ -29,8 +29,10 @@ import (
 	"knative.dev/pkg/webhook/resourcesemantics"
 )
 
-var _ apis.Validatable = (*StepAction)(nil)
-var _ resourcesemantics.VerbLimited = (*StepAction)(nil)
+var (
+	_ apis.Validatable              = (*StepAction)(nil)
+	_ resourcesemantics.VerbLimited = (*StepAction)(nil)
+)
 
 // SupportedVerbs returns the operations that validation should be called for
 func (s *StepAction) SupportedVerbs() []admissionregistrationv1.OperationType {
@@ -62,14 +64,27 @@ func (ss *StepActionSpec) Validate(ctx context.Context) (errs *apis.FieldError) 
 		if strings.HasPrefix(cleaned, "#!win") {
 			errs = errs.Also(config.ValidateEnabledAPIFields(ctx, "windows script support", config.AlphaAPIFields).ViaField("script"))
 		}
+		errs = errs.Also(validateNoParamSubstitutionsInScript(ss.Script))
 	}
 	errs = errs.Also(validateUsageOfDeclaredParameters(ctx, *ss))
 	errs = errs.Also(v1.ValidateParameterTypes(ctx, ss.Params).ViaField("params"))
 	errs = errs.Also(validateParameterVariables(ctx, *ss, ss.Params))
-	errs = errs.Also(validateStepActionResultsVariables(ctx, *ss))
-	errs = errs.Also(validateResults(ctx, ss.Results).ViaField("results"))
+	errs = errs.Also(v1.ValidateStepResultsVariables(ctx, ss.Results, ss.Script))
+	errs = errs.Also(v1.ValidateStepResults(ctx, ss.Results).ViaField("results"))
 	errs = errs.Also(validateVolumeMounts(ss.VolumeMounts, ss.Params).ViaField("volumeMounts"))
 	return errs
+}
+
+// validateNoParamSubstitutionsInScript validates that param substitutions are not invoked in the script
+func validateNoParamSubstitutionsInScript(script string) *apis.FieldError {
+	_, present, errString := substitution.ExtractVariablesFromString(script, "params")
+	if errString != "" || present {
+		return &apis.FieldError{
+			Message: "param substitution in scripts is not allowed.",
+			Paths:   []string{"script"},
+		}
+	}
+	return nil
 }
 
 // validateUsageOfDeclaredParameters validates that all parameters referenced in the Task are declared by the Task.
@@ -81,13 +96,6 @@ func validateUsageOfDeclaredParameters(ctx context.Context, sas StepActionSpec) 
 	errs = errs.Also(validateStepActionVariables(ctx, sas, "params", allParameterNames))
 	errs = errs.Also(validateObjectUsage(ctx, sas, objectParams))
 	errs = errs.Also(v1.ValidateObjectParamsHaveProperties(ctx, params))
-	return errs
-}
-
-func validateResults(ctx context.Context, results []StepActionResult) (errs *apis.FieldError) {
-	for index, result := range results {
-		errs = errs.Also(result.validate(ctx).ViaIndex(index))
-	}
 	return errs
 }
 
@@ -121,7 +129,80 @@ func validateParameterVariables(ctx context.Context, sas StepActionSpec, params 
 	stringParameterNames := sets.NewString(stringParams.GetNames()...)
 	arrayParameterNames := sets.NewString(arrayParams.GetNames()...)
 	errs = errs.Also(v1.ValidateNameFormat(stringParameterNames.Insert(arrayParameterNames.List()...), objectParams))
-	return errs.Also(validateStepActionArrayUsage(sas, "params", arrayParameterNames))
+	errs = errs.Also(validateStepActionArrayUsage(sas, "params", arrayParameterNames))
+	return errs.Also(validateDefaultParameterReferences(params))
+}
+
+// validateDefaultParameterReferences ensures that parameters referenced in default values are defined
+func validateDefaultParameterReferences(params v1.ParamSpecs) *apis.FieldError {
+	var errs *apis.FieldError
+	allParams := sets.NewString(params.GetNames()...)
+
+	// First pass: collect all parameters that have no references in their default values
+	resolvedParams := sets.NewString()
+	paramsNeedingResolution := make(map[string][]string)
+
+	for _, p := range params {
+		if p.Default != nil {
+			matches, _ := substitution.ExtractVariableExpressions(p.Default.StringVal, "params")
+			if len(matches) == 0 {
+				resolvedParams.Insert(p.Name)
+			} else {
+				// Track which parameters this parameter depends on
+				referencedParams := make([]string, 0, len(matches))
+				hasUndefinedParam := false
+				for _, match := range matches {
+					paramName := strings.TrimSuffix(strings.TrimPrefix(match, "$(params."), ")")
+					if !allParams.Has(paramName) {
+						hasUndefinedParam = true
+						errs = errs.Also(&apis.FieldError{
+							Message: fmt.Sprintf("param %q default value references param %q which is not defined", p.Name, paramName),
+							Paths:   []string{"params"},
+						})
+					}
+					referencedParams = append(referencedParams, paramName)
+				}
+				// Only track dependencies if all referenced parameters exist
+				if !hasUndefinedParam {
+					paramsNeedingResolution[p.Name] = referencedParams
+				}
+			}
+		} else {
+			resolvedParams.Insert(p.Name)
+		}
+	}
+
+	// Second pass: iteratively resolve parameters whose dependencies are satisfied
+	for len(paramsNeedingResolution) > 0 {
+		paramWasResolved := false
+		for paramName, referencedParams := range paramsNeedingResolution {
+			canResolveParam := true
+			for _, referencedParam := range referencedParams {
+				if !resolvedParams.Has(referencedParam) {
+					canResolveParam = false
+					break
+				}
+			}
+			if canResolveParam {
+				resolvedParams.Insert(paramName)
+				delete(paramsNeedingResolution, paramName)
+				paramWasResolved = true
+			}
+		}
+		if !paramWasResolved {
+			// If we couldn't resolve any parameters in this iteration,
+			// we have a circular dependency
+			for paramName := range paramsNeedingResolution {
+				errs = errs.Also(&apis.FieldError{
+					Message: fmt.Sprintf("param %q default value has a circular dependency", paramName),
+					Paths:   []string{"params"},
+				})
+			}
+			break
+		}
+	}
+
+	return errs
 }
 
 // validateObjectUsage validates the usage of individual attributes of an object param and the usage of the entire object
@@ -138,7 +219,7 @@ func validateObjectUsage(ctx context.Context, sas StepActionSpec, params v1.Para
 		}
 
 		// check if the object's key names are referenced correctly i.e. param.objectParam.key1
-		errs = errs.Also(validateStepActionVariables(ctx, sas, fmt.Sprintf("params\\.%s", p.Name), objectKeys))
+		errs = errs.Also(validateStepActionVariables(ctx, sas, "params\\."+p.Name, objectKeys))
 	}
 
 	return errs.Also(validateStepActionObjectUsageAsWhole(sas, "params", objectParameterNames))
@@ -198,16 +279,5 @@ func validateStepActionVariables(ctx context.Context, sas StepActionSpec, prefix
 	for i, vm := range sas.VolumeMounts {
 		errs = errs.Also(substitution.ValidateNoReferencesToUnknownVariables(vm.Name, prefix, vars).ViaFieldIndex("volumeMounts", i))
 	}
-	return errs
-}
-
-// validateStepActionResultsVariables validates if the results referenced in step script are defined in task results
-func validateStepActionResultsVariables(ctx context.Context, sas StepActionSpec) (errs *apis.FieldError) {
-	results := sas.Results
-	resultsNames := sets.NewString()
-	for _, r := range results {
-		resultsNames.Insert(r.Name)
-	}
-	errs = errs.Also(substitution.ValidateNoReferencesToUnknownVariables(sas.Script, "results", resultsNames).ViaField("script"))
 	return errs
 }

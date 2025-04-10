@@ -67,7 +67,7 @@ func TestStepActionSpecValidate(t *testing.T) {
 		Script       string
 		Env          []corev1.EnvVar
 		Params       []v1.ParamSpec
-		Results      []v1alpha1.StepActionResult
+		Results      []v1.StepResult
 		VolumeMounts []corev1.VolumeMount
 	}
 	tests := []struct {
@@ -79,6 +79,38 @@ func TestStepActionSpecValidate(t *testing.T) {
 			Image:   "myimage",
 			Command: []string{"ls"},
 			Args:    []string{"-lh"},
+		},
+	}, {
+		name: "valid param default value references defined param",
+		fields: fields{
+			Image: "myimage",
+			Params: []v1.ParamSpec{{
+				Name:    "param1",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("hello"),
+			}, {
+				Name:    "param2",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param1) world"),
+			}},
+		},
+	}, {
+		name: "multiple param references in default value",
+		fields: fields{
+			Image: "myimage",
+			Params: []v1.ParamSpec{{
+				Name:    "param1",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("hello"),
+			}, {
+				Name:    "param2",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("hi"),
+			}, {
+				Name:    "param3",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param1) $(params.param2)"),
+			}},
 		},
 	}, {
 		name: "step action with script",
@@ -192,24 +224,11 @@ func TestStepActionSpecValidate(t *testing.T) {
 			Args:    []string{"$(params.baz[*])", "middle string", "$(params.foo-is-baz[*])"},
 		},
 	}, {
-		name: "valid step with parameterized script",
-		fields: fields{
-			Params: []v1.ParamSpec{{
-				Name: "baz",
-			}, {
-				Name: "foo-is-baz",
-			}},
-			Image: "my-image",
-			Script: `
-				#!/usr/bin/env bash
-				hello $(params.baz)`,
-		},
-	}, {
 		name: "valid result",
 		fields: fields{
 			Image: "my-image",
 			Args:  []string{"arg"},
-			Results: []v1alpha1.StepActionResult{{
+			Results: []v1.StepResult{{
 				Name:        "MY-RESULT",
 				Description: "my great result",
 			}},
@@ -219,7 +238,7 @@ func TestStepActionSpecValidate(t *testing.T) {
 		fields: fields{
 			Image: "my-image",
 			Args:  []string{"arg"},
-			Results: []v1alpha1.StepActionResult{{
+			Results: []v1.StepResult{{
 				Name:        "MY-RESULT",
 				Type:        "string",
 				Description: "my great result",
@@ -230,7 +249,7 @@ func TestStepActionSpecValidate(t *testing.T) {
 		fields: fields{
 			Image: "my-image",
 			Args:  []string{"arg"},
-			Results: []v1alpha1.StepActionResult{{
+			Results: []v1.StepResult{{
 				Name:        "MY-RESULT",
 				Type:        v1.ResultsTypeArray,
 				Description: "my great result",
@@ -241,7 +260,7 @@ func TestStepActionSpecValidate(t *testing.T) {
 		fields: fields{
 			Image: "my-image",
 			Args:  []string{"arg"},
-			Results: []v1alpha1.StepActionResult{{
+			Results: []v1.StepResult{{
 				Name:        "MY-RESULT",
 				Type:        v1.ResultsTypeObject,
 				Description: "my great result",
@@ -310,7 +329,7 @@ func TestStepActionValidateError(t *testing.T) {
 		Script       string
 		Env          []corev1.EnvVar
 		Params       []v1.ParamSpec
-		Results      []v1alpha1.StepActionResult
+		Results      []v1.StepResult
 		VolumeMounts []corev1.VolumeMount
 	}
 	tests := []struct {
@@ -553,6 +572,69 @@ func TestStepActionValidateError(t *testing.T) {
 			Message: `non-existent variable in "$(params.gitrepo.foo)"`,
 			Paths:   []string{"spec.volumeMounts[0]"},
 		},
+	}, {
+		name: "circular dependency in param default values",
+		fields: fields{
+			Image: "myimage",
+			Params: []v1.ParamSpec{{
+				Name:    "param1",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param2)"),
+			}, {
+				Name:    "param2",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param1)"),
+			}},
+		},
+		expectedError: *((&apis.FieldError{
+			Message: `param "param1" default value has a circular dependency`,
+			Paths:   []string{"spec.params"},
+		}).Also(&apis.FieldError{
+			Message: `param "param2" default value has a circular dependency`,
+			Paths:   []string{"spec.params"},
+		})),
+	}, {
+		name: "complex circular dependency in param default values",
+		fields: fields{
+			Image: "myimage",
+			Params: []v1.ParamSpec{{
+				Name:    "param1",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param2)"),
+			}, {
+				Name:    "param2",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param3)"),
+			}, {
+				Name:    "param3",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param1)"),
+			}},
+		},
+		expectedError: *((&apis.FieldError{
+			Message: `param "param1" default value has a circular dependency`,
+			Paths:   []string{"spec.params"},
+		}).Also(&apis.FieldError{
+			Message: `param "param2" default value has a circular dependency`,
+			Paths:   []string{"spec.params"},
+		}).Also(&apis.FieldError{
+			Message: `param "param3" default value has a circular dependency`,
+			Paths:   []string{"spec.params"},
+		})),
+	}, {
+		name: "self-referential param default value",
+		fields: fields{
+			Image: "myimage",
+			Params: []v1.ParamSpec{{
+				Name:    "param1",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param1)"),
+			}},
+		},
+		expectedError: apis.FieldError{
+			Message: `param "param1" default value has a circular dependency`,
+			Paths:   []string{"spec.params"},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -575,6 +657,7 @@ func TestStepActionValidateError(t *testing.T) {
 			if err == nil {
 				t.Fatalf("Expected an error, got nothing for %v", sa)
 			}
+			t.Logf("Actual error: %v", err)
 			if d := cmp.Diff(tt.expectedError.Error(), err.Error(), cmpopts.IgnoreUnexported(apis.FieldError{})); d != "" {
 				t.Errorf("StepActionSpec.Validate() errors diff %s", diff.PrintWantGot(d))
 			}
@@ -590,7 +673,7 @@ func TestStepActionSpecValidateError(t *testing.T) {
 		Script  string
 		Env     []corev1.EnvVar
 		Params  []v1.ParamSpec
-		Results []v1alpha1.StepActionResult
+		Results []v1.StepResult
 	}
 	tests := []struct {
 		name          string
@@ -604,6 +687,20 @@ func TestStepActionSpecValidateError(t *testing.T) {
 		expectedError: apis.FieldError{
 			Message: `missing field(s)`,
 			Paths:   []string{"Image"},
+		},
+	}, {
+		name: "param default value references undefined param",
+		fields: fields{
+			Image: "myimage",
+			Params: []v1.ParamSpec{{
+				Name:    "param2",
+				Type:    v1.ParamTypeString,
+				Default: v1.NewStructuredValues("$(params.param1)"),
+			}},
+		},
+		expectedError: apis.FieldError{
+			Message: `param "param2" default value references param "param1" which is not defined`,
+			Paths:   []string{"params"},
 		},
 	}, {
 		name: "command and script both used.",
@@ -633,10 +730,23 @@ func TestStepActionSpecValidateError(t *testing.T) {
 			Script: `
 			#!/usr/bin/env bash
 			date | tee $(results.non-exist.path)`,
-			Results: []v1alpha1.StepActionResult{{Name: "a-result"}},
+			Results: []v1.StepResult{{Name: "a-result"}},
 		},
 		expectedError: apis.FieldError{
 			Message: `non-existent variable in "\n\t\t\t#!/usr/bin/env bash\n\t\t\tdate | tee $(results.non-exist.path)"`,
+			Paths:   []string{"script"},
+		},
+	}, {
+		name: "step script refers to nonexistent stepresult",
+		fields: fields{
+			Image: "my-image",
+			Script: `
+			#!/usr/bin/env bash
+			date | tee $(step.results.non-exist.path)`,
+			Results: []v1.StepResult{{Name: "a-result"}},
+		},
+		expectedError: apis.FieldError{
+			Message: `non-existent variable in "\n\t\t\t#!/usr/bin/env bash\n\t\t\tdate | tee $(step.results.non-exist.path)"`,
 			Paths:   []string{"script"},
 		},
 	}, {
@@ -861,23 +971,6 @@ func TestStepActionSpecValidateError(t *testing.T) {
 			Paths:   []string{"image"},
 		},
 	}, {
-		name: "array star used illegaly in script field",
-		fields: fields{
-			Params: []v1.ParamSpec{{
-				Name: "baz",
-				Type: v1.ParamTypeArray,
-			}, {
-				Name: "foo-is-baz",
-				Type: v1.ParamTypeArray,
-			}},
-			Script: "$(params.baz[*])",
-			Image:  "my-image",
-		},
-		expectedError: apis.FieldError{
-			Message: `variable type invalid in "$(params.baz[*])"`,
-			Paths:   []string{"script"},
-		},
-	}, {
 		name: "array not properly isolated",
 		fields: fields{
 			Params: []v1.ParamSpec{{
@@ -949,6 +1042,23 @@ func TestStepActionSpecValidateError(t *testing.T) {
 			Message: `variable is not properly isolated in "not isolated: $(params.baz[*])"`,
 			Paths:   []string{"args[0]"},
 		},
+	}, {
+		name: "params used in script field",
+		fields: fields{
+			Params: []v1.ParamSpec{{
+				Name: "baz",
+				Type: v1.ParamTypeArray,
+			}, {
+				Name: "foo-is-baz",
+				Type: v1.ParamTypeString,
+			}},
+			Script: "$(params.baz[0]), $(params.foo-is-baz)",
+			Image:  "my-image",
+		},
+		expectedError: apis.FieldError{
+			Message: `param substitution in scripts is not allowed.`,
+			Paths:   []string{"script"},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -967,6 +1077,7 @@ func TestStepActionSpecValidateError(t *testing.T) {
 			if err == nil {
 				t.Fatalf("Expected an error, got nothing for %v", sa)
 			}
+			t.Logf("Actual error: %v", err)
 			if d := cmp.Diff(tt.expectedError.Error(), err.Error(), cmpopts.IgnoreUnexported(apis.FieldError{})); d != "" {
 				t.Errorf("StepActionSpec.Validate() errors diff %s", diff.PrintWantGot(d))
 			}

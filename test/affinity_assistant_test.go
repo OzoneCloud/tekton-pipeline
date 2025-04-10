@@ -22,7 +22,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
@@ -56,14 +55,14 @@ spec:
       - name: my-workspace
       taskSpec:
         steps:
-        - image: busybox
+        - image: mirror.gcr.io/busybox
           script: echo hello foo
     - name: bar
       workspaces:
       - name: my-workspace
       taskSpec:
         steps:
-        - image: busybox
+        - image: mirror.gcr.io/busybox
           script: echo hello bar
   workspaces:
   - name: my-workspace
@@ -128,8 +127,7 @@ func TestAffinityAssistant_PerPipelineRun(t *testing.T) {
 
 	// update feature flag
 	configMapData := map[string]string{
-		"coschedule":                 config.CoschedulePipelineRuns,
-		"disable-affinity-assistant": "true",
+		"coschedule": config.CoschedulePipelineRuns,
 	}
 	if err := updateConfigMap(ctx, c.KubeClient, system.Namespace(), config.GetFeatureFlagsConfigName(), configMapData); err != nil {
 		t.Fatal(err)
@@ -151,14 +149,14 @@ spec:
       - name: my-workspace
       taskSpec:
         steps:
-        - image: busybox
+        - image: mirror.gcr.io/busybox
           script: echo hello foo
     - name: bar
       workspaces:
       - name: my-workspace2
       taskSpec:
         steps:
-        - image: busybox
+        - image: mirror.gcr.io/busybox
           script: echo hello bar
     - name: double-ws
       workspaces:
@@ -166,12 +164,12 @@ spec:
       - name: my-workspace2
       taskSpec:
         steps:
-        - image: busybox
+        - image: mirror.gcr.io/busybox
           script: echo double-ws
     - name: no-ws
       taskSpec:
         steps:
-        - image: busybox
+        - image: mirror.gcr.io/busybox
         script: echo no-ws
   workspaces:
   - name: my-workspace
@@ -237,8 +235,7 @@ func validatePodAffinity(t *testing.T, ctx context.Context, podNames []string, n
 func resetFeatureFlagAndCleanup(ctx context.Context, t *testing.T, c *clients, namespace string) {
 	t.Helper()
 	configMapData := map[string]string{
-		"coschedule":                 config.DefaultCoschedule,
-		"disable-affinity-assistant": strconv.FormatBool(config.DefaultDisableAffinityAssistant),
+		"coschedule": config.DefaultCoschedule,
 	}
 	if err := updateConfigMap(ctx, c.KubeClient, system.Namespace(), config.GetFeatureFlagsConfigName(), configMapData); err != nil {
 		t.Fatal(err)

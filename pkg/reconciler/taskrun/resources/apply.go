@@ -18,15 +18,22 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
+	"strings"
 
+	"github.com/tektoncd/pipeline/internal/artifactref"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/container"
+	"github.com/tektoncd/pipeline/pkg/internal/resultref"
 	"github.com/tektoncd/pipeline/pkg/pod"
 	"github.com/tektoncd/pipeline/pkg/substitution"
+	"github.com/tektoncd/pipeline/pkg/workspace"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -44,28 +51,312 @@ var (
 		// FIXME(vdemeester) Remove that with deprecating v1beta1
 		"inputs.params.%s",
 	}
+
+	substitutionToParamNamePatterns = []string{
+		`^params\.(\w+)$`,
+		`^params\["([^"]+)"\]$`,
+		`^params\['([^']+)'\]$`,
+		// FIXME(vdemeester) Remove that with deprecating v1beta1
+		`^inputs\.params\.(\w+)$`,
+	}
+
+	paramIndexRegexPatterns = []string{
+		`\$\(params.%s\[([0-9]*)*\*?\]\)`,
+		`\$\(params\[%q\]\[([0-9]*)*\*?\]\)`,
+		`\$\(params\['%s'\]\[([0-9]*)*\*?\]\)`,
+	}
 )
 
-// applyStepActionParameters applies the params from the Task and the underlying Step to the referenced StepAction.
-func applyStepActionParameters(step *v1.Step, spec *v1.TaskSpec, tr *v1.TaskRun, stepParams v1.Params, defaults []v1.ParamSpec) *v1.Step {
+// applyStepActionParameters applies the params from the task and the underlying step to the referenced stepaction.
+// substitution order:
+// 1. taskrun parameter values in step parameters
+// 2. step-provided parameter values
+// 3. default values that reference other parameters
+// 4. simple default values
+// 5. step result references
+func applyStepActionParameters(step *v1.Step, spec *v1.TaskSpec, tr *v1.TaskRun, stepParams v1.Params, defaults []v1.ParamSpec) (*v1.Step, error) {
+	// 1. taskrun parameter substitutions to step parameters
 	if stepParams != nil {
 		stringR, arrayR, objectR := getTaskParameters(spec, tr, spec.Params...)
 		stepParams = stepParams.ReplaceVariables(stringR, arrayR, objectR)
 	}
-	// Set params from StepAction defaults
-	stringReplacements, arrayReplacements, _ := replacementsFromDefaultParams(defaults)
 
-	// Set and overwrite params with the ones from the Step
-	stepStrings, stepArrays, _ := replacementsFromParams(stepParams)
-	for k, v := range stepStrings {
+	// 2. step provided parameters
+	stepProvidedParams := make(map[string]v1.ParamValue)
+	for _, sp := range stepParams {
+		stepProvidedParams[sp.Name] = sp.Value
+	}
+	// 3,4. get replacements from default params (both referenced and simple)
+	stringReplacements, arrayReplacements, objectReplacements := replacementsFromDefaultParams(defaults)
+	// process parameter values in order of substitution (2,3,4)
+	processedParams := make([]v1.Param, 0, len(defaults))
+	// keep track of parameters that need resolution and their references
+	paramsNeedingResolution := make(map[string]bool)
+	paramReferenceMap := make(map[string][]string) // maps param name to names of params it references
+
+	// collect parameter references and handle parameters without references
+	for _, p := range defaults {
+		// 2. step provided parameters
+		if value, exists := stepProvidedParams[p.Name]; exists {
+			// parameter provided by step, add it to processed
+			processedParams = append(processedParams, v1.Param{
+				Name:  p.Name,
+				Value: value,
+			})
+			continue
+		}
+
+		// 3. default params
+		if p.Default != nil {
+			if !strings.Contains(p.Default.StringVal, "$(params.") {
+				// parameter has no references, add it to processed
+				processedParams = append(processedParams, v1.Param{
+					Name:  p.Name,
+					Value: *p.Default,
+				})
+				continue
+			}
+
+			// parameter has references to other parameters, track them >:(
+			paramsNeedingResolution[p.Name] = true
+			matches, _ := substitution.ExtractVariableExpressions(p.Default.StringVal, "params")
+			referencedParams := make([]string, 0, len(matches))
+			for _, match := range matches {
+				paramName := strings.TrimSuffix(strings.TrimPrefix(match, "$(params."), ")")
+				referencedParams = append(referencedParams, paramName)
+			}
+			paramReferenceMap[p.Name] = referencedParams
+		}
+	}
+
+	// process parameters until no more can be resolved
+	for len(paramsNeedingResolution) > 0 {
+		paramWasResolved := false
+		// track unresolved params and their references
+		unresolvedParams := make(map[string][]string)
+
+		for paramName := range paramsNeedingResolution {
+			canResolveParam := true
+			for _, referencedParam := range paramReferenceMap[paramName] {
+				// Check if referenced parameter is processed
+				isReferenceResolved := false
+				for _, pp := range processedParams {
+					if pp.Name == referencedParam {
+						isReferenceResolved = true
+						break
+					}
+				}
+				if !isReferenceResolved {
+					canResolveParam = false
+					unresolvedParams[paramName] = append(unresolvedParams[paramName], referencedParam)
+					break
+				}
+			}
+
+			if canResolveParam {
+				// process this parameter as all its references have been resolved
+				for _, p := range defaults {
+					if p.Name == paramName {
+						defaultValue := *p.Default
+						resolvedValue := defaultValue.StringVal
+						// hydrate parameter references
+						for _, referencedParam := range paramReferenceMap[paramName] {
+							for _, pp := range processedParams {
+								if pp.Name == referencedParam {
+									resolvedValue = strings.ReplaceAll(
+										resolvedValue,
+										fmt.Sprintf("$(params.%s)", referencedParam),
+										pp.Value.StringVal,
+									)
+									break
+								}
+							}
+						}
+						defaultValue.StringVal = resolvedValue
+						processedParams = append(processedParams, v1.Param{
+							Name:  paramName,
+							Value: defaultValue,
+						})
+						delete(paramsNeedingResolution, paramName)
+						paramWasResolved = true
+						break
+					}
+				}
+			}
+		}
+
+		// unresolvable parameters or circular dependencies
+		if !paramWasResolved {
+			// check parameter references to a non-existent parameter
+			for param, unresolvedRefs := range unresolvedParams {
+				// check referenced parameters in defaults
+				for _, ref := range unresolvedRefs {
+					exists := false
+					for _, p := range defaults {
+						if p.Name == ref {
+							exists = true
+							break
+						}
+					}
+					if !exists {
+						return nil, fmt.Errorf("parameter %q references non-existent parameter %q", param, ref)
+					}
+				}
+				// parameters exist but can't be resolved hence it's a circular dependency
+				return nil, errors.New("circular dependency detected in parameter references")
+			}
+		}
+	}
+
+	// apply the processed parameters and merge all replacements (2,3,4)
+	procStringReplacements, procArrayReplacements, procObjectReplacements := replacementsFromParams(processedParams)
+	// merge replacements from defaults and processed params
+	for k, v := range procStringReplacements {
 		stringReplacements[k] = v
 	}
-	for k, v := range stepArrays {
+	for k, v := range procArrayReplacements {
 		arrayReplacements[k] = v
+	}
+	for k, v := range procObjectReplacements {
+		if objectReplacements[k] == nil {
+			objectReplacements[k] = v
+		} else {
+			for key, val := range v {
+				objectReplacements[k][key] = val
+			}
+		}
+	}
+
+	// 5. set step result replacements last
+	if stepResultReplacements, err := replacementsFromStepResults(step, stepParams, defaults); err != nil {
+		return nil, err
+	} else {
+		// merge step result replacements into string replacements last
+		for k, v := range stepResultReplacements {
+			stringReplacements[k] = v
+		}
+	}
+
+	// check if there are duplicate keys in the replacements
+	// if the same key is present in both stringReplacements and arrayReplacements, it means
+	// that the default value and the passed value have different types.
+	if err := checkForDuplicateKeys(stringReplacements, arrayReplacements); err != nil {
+		return nil, err
 	}
 
 	container.ApplyStepReplacements(step, stringReplacements, arrayReplacements)
-	return step
+
+	return step, nil
+}
+
+// checkForDuplicateKeys checks if there are duplicate keys in the replacements
+func checkForDuplicateKeys(stringReplacements map[string]string, arrayReplacements map[string][]string) error {
+	keys := make([]string, 0, len(stringReplacements))
+	for k := range stringReplacements {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if _, ok := arrayReplacements[k]; ok {
+			paramName := paramNameFromReplacementKey(k)
+			return fmt.Errorf("invalid parameter substitution: %s. Please check the types of the default value and the passed value", paramName)
+		}
+	}
+	return nil
+}
+
+// paramNameFromReplacementKey returns the param name from the replacement key in best effort
+func paramNameFromReplacementKey(key string) string {
+	for _, regexPattern := range substitutionToParamNamePatterns {
+		re := regexp.MustCompile(regexPattern)
+		if matches := re.FindStringSubmatch(key); matches != nil {
+			return matches[1]
+		}
+	}
+	// If no match is found, return the key
+	return key
+}
+
+// findArrayIndexParamUsage finds the array index in a string using array param substitution
+func findArrayIndexParamUsage(s string, paramName string, stepName string, resultName string, stringReplacements map[string]string) map[string]string {
+	for _, pattern := range paramIndexRegexPatterns {
+		arrayIndexingRegex := regexp.MustCompile(fmt.Sprintf(pattern, paramName))
+		matches := arrayIndexingRegex.FindAllStringSubmatch(s, -1)
+		for _, match := range matches {
+			if len(match) == 2 {
+				key := strings.TrimSuffix(strings.TrimPrefix(match[0], "$("), ")")
+				if match[1] != "" {
+					stringReplacements[key] = fmt.Sprintf("$(steps.%s.results.%s[%s])", stepName, resultName, match[1])
+				}
+			}
+		}
+	}
+	return stringReplacements
+}
+
+// replacementsArrayIdxStepResults looks for Step Result array usage with index in the Step's command, args, env and script.
+func replacementsArrayIdxStepResults(step *v1.Step, paramName string, stepName string, resultName string) map[string]string {
+	stringReplacements := map[string]string{}
+	for _, c := range step.Command {
+		stringReplacements = findArrayIndexParamUsage(c, paramName, stepName, resultName, stringReplacements)
+	}
+	for _, a := range step.Args {
+		stringReplacements = findArrayIndexParamUsage(a, paramName, stepName, resultName, stringReplacements)
+	}
+	for _, e := range step.Env {
+		stringReplacements = findArrayIndexParamUsage(e.Value, paramName, stepName, resultName, stringReplacements)
+	}
+	return stringReplacements
+}
+
+// replacementsFromStepResults generates string replacements for params whose values is a variable substitution of a step result.
+func replacementsFromStepResults(step *v1.Step, stepParams v1.Params, defaults []v1.ParamSpec) (map[string]string, error) {
+	stringReplacements := map[string]string{}
+	for _, sp := range stepParams {
+		if sp.Value.StringVal != "" && strings.HasPrefix(sp.Value.StringVal, "$(steps.") {
+			// eg: when parameter p1 references a step result, replace:
+			// $(params.p1) with $(steps.step1.results.foo)
+			value := strings.TrimSuffix(strings.TrimPrefix(sp.Value.StringVal, "$("), ")")
+			pr, err := resultref.ParseStepExpression(value)
+			if err != nil {
+				return nil, err
+			}
+			for _, d := range defaults {
+				if d.Name == sp.Name {
+					switch d.Type {
+					case v1.ParamTypeObject:
+						for k := range d.Properties {
+							stringReplacements[fmt.Sprintf("params.%s.%s", d.Name, k)] = fmt.Sprintf("$(steps.%s.results.%s.%s)", pr.ResourceName, pr.ResultName, k)
+						}
+					case v1.ParamTypeArray:
+						// for array parameters
+
+						// with star notation, replace:
+						// $(params.p1[*]) with $(steps.step1.results.foo[*])
+						for _, pattern := range paramPatterns {
+							stringReplacements[fmt.Sprintf(pattern+"[*]", d.Name)] = fmt.Sprintf("$(steps.%s.results.%s[*])", pr.ResourceName, pr.ResultName)
+						}
+						// with index notation, replace:
+						// $(params.p1[idx]) with $(steps.step1.results.foo[idx])
+						for k, v := range replacementsArrayIdxStepResults(step, d.Name, pr.ResourceName, pr.ResultName) {
+							stringReplacements[k] = v
+						}
+					case v1.ParamTypeString:
+						fallthrough
+					default:
+						// for string parameters and default case,
+						// replace any reference to the parameter with the step result reference
+						// since both use simple value substitution
+						// eg: replace $(params.p1) with $(steps.step1.results.foo)
+						for _, pattern := range paramPatterns {
+							stringReplacements[fmt.Sprintf(pattern, d.Name)] = sp.Value.StringVal
+						}
+					}
+				}
+			}
+		}
+	}
+	return stringReplacements, nil
 }
 
 // getTaskParameters gets the string, array and object parameter variable replacements needed in the Task
@@ -93,6 +384,7 @@ func getTaskParameters(spec *v1.TaskSpec, tr *v1.TaskRun, defaults ...v1.ParamSp
 			}
 		}
 	}
+
 	return stringReplacements, arrayReplacements, objectReplacements
 }
 
@@ -107,13 +399,13 @@ func replacementsFromDefaultParams(defaults v1.ParamSpecs) (map[string]string, m
 	arrayReplacements := map[string][]string{}
 	objectReplacements := map[string]map[string]string{}
 
-	// Set all the default stringReplacements
+	// First pass: collect all non-reference default values
 	for _, p := range defaults {
-		if p.Default != nil {
+		if p.Default != nil && !strings.Contains(p.Default.StringVal, "$(params.") {
 			switch p.Default.Type {
 			case v1.ParamTypeArray:
 				for _, pattern := range paramPatterns {
-					for i := 0; i < len(p.Default.ArrayVal); i++ {
+					for i := range len(p.Default.ArrayVal) {
 						stringReplacements[fmt.Sprintf(pattern+"[%d]", p.Name, i)] = p.Default.ArrayVal[i]
 					}
 					arrayReplacements[fmt.Sprintf(pattern, p.Name)] = p.Default.ArrayVal
@@ -134,6 +426,32 @@ func replacementsFromDefaultParams(defaults v1.ParamSpecs) (map[string]string, m
 			}
 		}
 	}
+
+	// Second pass: handle parameter references in default values
+	for _, p := range defaults {
+		if p.Default != nil && strings.Contains(p.Default.StringVal, "$(params.") {
+			// extract referenced parameter name
+			matches, _ := substitution.ExtractVariableExpressions(p.Default.StringVal, "params")
+			for _, match := range matches {
+				paramName := strings.TrimPrefix(match, "$(params.")
+				paramName = strings.TrimSuffix(paramName, ")")
+
+				// find referenced parameter value
+				for _, pattern := range paramPatterns {
+					key := fmt.Sprintf(pattern, paramName)
+					if value, exists := stringReplacements[key]; exists {
+						// Apply the value to this parameter's default
+						resolvedValue := strings.ReplaceAll(p.Default.StringVal, match, value)
+						for _, pattern := range paramPatterns {
+							stringReplacements[fmt.Sprintf(pattern, p.Name)] = resolvedValue
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
 	return stringReplacements, arrayReplacements, objectReplacements
 }
 
@@ -148,7 +466,7 @@ func replacementsFromParams(params v1.Params) (map[string]string, map[string][]s
 		switch p.Value.Type {
 		case v1.ParamTypeArray:
 			for _, pattern := range paramPatterns {
-				for i := 0; i < len(p.Value.ArrayVal); i++ {
+				for i := range len(p.Value.ArrayVal) {
 					stringReplacements[fmt.Sprintf(pattern+"[%d]", p.Name, i)] = p.Value.ArrayVal[i]
 				}
 				arrayReplacements[fmt.Sprintf(pattern, p.Name)] = p.Value.ArrayVal
@@ -223,6 +541,14 @@ func ApplyWorkspaces(ctx context.Context, spec *v1.TaskSpec, declarations []v1.W
 	return ApplyReplacements(spec, stringReplacements, map[string][]string{}, map[string]map[string]string{})
 }
 
+// ApplyParametersToWorkspaceBindings applies parameters to the WorkspaceBindings of a TaskRun. It takes a TaskSpec and a TaskRun as input and returns the modified TaskRun.
+func ApplyParametersToWorkspaceBindings(ts *v1.TaskSpec, tr *v1.TaskRun) *v1.TaskRun {
+	tsCopy := ts.DeepCopy()
+	parameters, _, _ := getTaskParameters(tsCopy, tr, tsCopy.Params...)
+	tr.Spec.Workspaces = workspace.ReplaceWorkspaceBindingsVars(tr.Spec.Workspaces, parameters)
+	return tr
+}
+
 // applyWorkspaceMountPath accepts a workspace path variable of the form $(workspaces.foo.path) and replaces
 // it in the fields of the TaskSpec. A new updated TaskSpec is returned. Steps or Sidecars in the TaskSpec
 // that override the mountPath will receive that mountPath in place of the variable's value. Other Steps and
@@ -257,9 +583,38 @@ func applyWorkspaceMountPath(variable string, spec *v1.TaskSpec, declaration v1.
 	return ApplyReplacements(spec, stringReplacements, emptyArrayReplacements, map[string]map[string]string{})
 }
 
-// ApplyTaskResults applies the substitution from values in results which are referenced in spec as subitems
+// ApplyResults applies the substitution from values in results and step results which are referenced in spec as subitems
 // of the replacementStr.
-func ApplyTaskResults(spec *v1.TaskSpec) *v1.TaskSpec {
+func ApplyResults(spec *v1.TaskSpec) *v1.TaskSpec {
+	// Apply all the Step Result replacements
+	for i := range spec.Steps {
+		stringReplacements := getStepResultReplacements(spec.Steps[i], i)
+		container.ApplyStepReplacements(&spec.Steps[i], stringReplacements, map[string][]string{})
+	}
+	stringReplacements := getTaskResultReplacements(spec)
+	return ApplyReplacements(spec, stringReplacements, map[string][]string{}, map[string]map[string]string{})
+}
+
+// getStepResultReplacements creates all combinations of string replacements from Step Results.
+func getStepResultReplacements(step v1.Step, idx int) map[string]string {
+	stringReplacements := map[string]string{}
+
+	patterns := []string{
+		"step.results.%s.path",
+		"step.results[%q].path",
+		"step.results['%s'].path",
+	}
+	stepName := pod.StepName(step.Name, idx)
+	for _, result := range step.Results {
+		for _, pattern := range patterns {
+			stringReplacements[fmt.Sprintf(pattern, result.Name)] = filepath.Join(pipeline.StepsDir, stepName, "results", result.Name)
+		}
+	}
+	return stringReplacements
+}
+
+// getTaskResultReplacements creates all combinations of string replacements from TaskResults.
+func getTaskResultReplacements(spec *v1.TaskSpec) map[string]string {
 	stringReplacements := map[string]string{}
 
 	patterns := []string{
@@ -273,7 +628,25 @@ func ApplyTaskResults(spec *v1.TaskSpec) *v1.TaskSpec {
 			stringReplacements[fmt.Sprintf(pattern, result.Name)] = filepath.Join(pipeline.DefaultResultPath, result.Name)
 		}
 	}
-	return ApplyReplacements(spec, stringReplacements, map[string][]string{}, map[string]map[string]string{})
+	return stringReplacements
+}
+
+// ApplyArtifacts replaces the occurrences of artifacts.path and step.artifacts.path with the absolute tekton internal path
+func ApplyArtifacts(spec *v1.TaskSpec) *v1.TaskSpec {
+	for i := range spec.Steps {
+		stringReplacements := getArtifactReplacements(spec.Steps[i], i)
+		container.ApplyStepReplacements(&spec.Steps[i], stringReplacements, map[string][]string{})
+	}
+	return spec
+}
+
+func getArtifactReplacements(step v1.Step, idx int) map[string]string {
+	stringReplacements := map[string]string{}
+	stepName := pod.StepName(step.Name, idx)
+	stringReplacements[artifactref.StepArtifactPathPattern] = filepath.Join(pipeline.StepsDir, stepName, "artifacts", "provenance.json")
+	stringReplacements[artifactref.TaskArtifactPathPattern] = filepath.Join(pipeline.ArtifactsDir, "provenance.json")
+
+	return stringReplacements
 }
 
 // ApplyStepExitCodePath replaces the occurrences of exitCode path with the absolute tekton internal path
@@ -282,8 +655,7 @@ func ApplyStepExitCodePath(spec *v1.TaskSpec) *v1.TaskSpec {
 	stringReplacements := map[string]string{}
 
 	for i, step := range spec.Steps {
-		stringReplacements[fmt.Sprintf("steps.%s.exitCode.path", pod.StepName(step.Name, i))] =
-			filepath.Join(pipeline.StepsDir, pod.StepName(step.Name, i), "exitCode")
+		stringReplacements[fmt.Sprintf("steps.%s.exitCode.path", pod.StepName(step.Name, i))] = filepath.Join(pipeline.StepsDir, pod.StepName(step.Name, i), "exitCode")
 	}
 	return ApplyReplacements(spec, stringReplacements, map[string][]string{}, map[string]map[string]string{})
 }

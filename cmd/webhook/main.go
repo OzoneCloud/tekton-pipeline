@@ -60,6 +60,7 @@ var types = map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
 	v1beta1.SchemeGroupVersion.WithKind("TaskRun"):     &v1beta1.TaskRun{},
 	v1beta1.SchemeGroupVersion.WithKind("PipelineRun"): &v1beta1.PipelineRun{},
 	v1beta1.SchemeGroupVersion.WithKind("CustomRun"):   &v1beta1.CustomRun{},
+	v1beta1.SchemeGroupVersion.WithKind("StepAction"):  &v1beta1.StepAction{},
 	// v1
 	v1.SchemeGroupVersion.WithKind("Task"):        &v1.Task{},
 	v1.SchemeGroupVersion.WithKind("Pipeline"):    &v1.Pipeline{},
@@ -171,9 +172,13 @@ func newConversionController(ctx context.Context, cmw configmap.Watcher) *contro
 		// conversions to and from all types.
 		// "Zygotes" are the supported versions.
 		map[schema.GroupKind]conversion.GroupKindConversion{
-			v1alpha1.Kind("StepAction"): {
+			v1beta1.Kind("StepAction"): {
 				DefinitionName: pipeline.StepActionResource.String(),
 				HubVersion:     v1alpha1GroupVersion,
+				Zygotes: map[string]conversion.ConvertibleObject{
+					v1alpha1GroupVersion: &v1alpha1.StepAction{},
+					v1beta1GroupVersion:  &v1beta1.StepAction{},
+				},
 			},
 			v1.Kind("Task"): {
 				DefinitionName: pipeline.TaskResource.String(),
@@ -240,6 +245,12 @@ func main() {
 		webhookName = "webhook.pipeline.tekton.dev"
 	}
 
+	var statsReporterOptions []webhook.StatsReporterOption
+	enableNamespace := os.Getenv("WEBHOOK_METRICS_ENABLE_NAMESPACE")
+	if enableNamespace != "true" {
+		statsReporterOptions = append(statsReporterOptions, webhook.WithoutTags("resource_namespace"))
+	}
+
 	// Scope informers to the webhook's namespace instead of cluster-wide
 	ctx := injection.WithNamespaceScope(signals.NewContext(), system.Namespace())
 
@@ -248,6 +259,8 @@ func main() {
 		ServiceName: serviceName,
 		Port:        webhook.PortFromEnv(8443),
 		SecretName:  secretName,
+
+		StatsReporterOptions: statsReporterOptions,
 	})
 
 	mux := http.NewServeMux()

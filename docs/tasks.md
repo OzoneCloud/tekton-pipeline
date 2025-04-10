@@ -19,7 +19,8 @@ weight: 201
     - [Accessing Step's `exitCode` in subsequent `Steps`](#accessing-steps-exitcode-in-subsequent-steps)
     - [Produce a task result with `onError`](#produce-a-task-result-with-onerror)
     - [Breakpoint on failure with `onError`](#breakpoint-on-failure-with-onerror)
-    - [Redirecting step output streams with `stdoutConfig` and `stderrConfig`](#redirecting-step-output-streams-with-stdoutConfig-and-stderrConfig)
+    - [Redirecting step output streams with `stdoutConfig` and `stderrConfig`](#redirecting-step-output-streams-with-stdoutconfig-and-stderrconfig)
+    - [Guarding `Step` execution using `when` expressions](#guarding-step-execution-using-when-expressions)
   - [Specifying `Parameters`](#specifying-parameters)
   - [Specifying `Workspaces`](#specifying-workspaces)
   - [Emitting `Results`](#emitting-results)
@@ -553,6 +554,107 @@ spec:
 > - There is currently a limit on the overall size of the `Task` results. If the stdout/stderr of a step is set to the path of a `Task` result and the step prints too many data, the result manifest would become too large. Currently the entrypoint binary will fail if that happens.
 > - If the stdout/stderr of a `Step` is set to the path of a `Task` result, e.g. `$(results.empty.path)`, but that result is not defined for the `Task`, the `Step` will run but the output will be captured in a file named `$(results.empty.path)` in the current working directory. Similarly, any stubstition that is not valid, e.g. `$(some.invalid.path)/out.txt`, will be left as-is and will result in a file path `$(some.invalid.path)/out.txt` relative to the current working directory.
 
+#### Guarding `Step` execution using `when` expressions
+
+You can define `when` in a `step` to control its execution. 
+
+The components of `when` expressions are `input`, `operator`, `values`, `cel`:
+
+| Component  | Description                                                                                                                                                                                                                                                      | Syntax                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `input`    | Input for the `when` expression, defaults to an empty string if not provided.                                                                                                                                                                                    | * Static values e.g. `"ubuntu"`<br/> * Variables (parameters or results) e.g. `"$(params.image)"` or `"$(tasks.task1.results.image)"` or `"$(tasks.task1.results.array-results[1])"`                                                                                                                                                                                                                                                                                                                                                       |
+| `operator` | `operator` represents an `input`'s relationship to a set of `values`, a valid `operator` must be provided.                                                                                                                                                       | `in` or `notin`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `values`   | An array of string values, the `values` array must be provided and has to be non-empty.                                                                                                                                                                          | * An array param e.g. `["$(params.images[*])"]`<br/> * An array result of a task `["$(tasks.task1.results.array-results[*])"]`<br/> * An array result of a step`["(steps.step1.results.array-results[*])"]`<br/>* `values` can contain static values e.g. `"ubuntu"`<br/> * `values` can contain variables (parameters or results) or a Workspaces's `bound` state e.g. `["$(params.image)"]` or `["$(steps.step1.results.image)"]` or `["$(tasks.task1.results.array-results[1])"]` or `["$(steps.step1.results.array-results[1])"]` |
+| `cel`      | The Common Expression Language (CEL) implements common semantics for expression evaluation, enabling different applications to more easily interoperate. This is an `alpha` feature, `enable-cel-in-whenexpression` needs to be set to true to use this feature. |  [cel-syntax](https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax)
+
+The below example shows how to use when expressions to control step executions:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc-2
+spec:
+  resources:
+    requests:
+      storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+---
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  generateName: step-when-example
+spec:
+  workspaces:
+    - name: custom
+      persistentVolumeClaim:
+        claimName: my-pvc-2
+  taskSpec:
+    description: |
+      A simple task that shows how to use when determine if a step should be executed
+    steps:
+      - name: should-execute
+        image: bash:latest
+        script: |
+          #!/usr/bin/env bash
+          echo "executed..."
+        when:
+          - input: "$(workspaces.custom.bound)"
+            operator: in
+            values: [ "true" ]
+      - name: should-skip
+        image: bash:latest
+        script: |
+          #!/usr/bin/env bash
+          echo skipskipskip
+        when:
+          - input: "$(workspaces.custom2.bound)"
+            operator: in
+            values: [ "true" ]
+      - name: should-continue
+        image: bash:latest
+        script: |
+          #!/usr/bin/env bash
+          echo blabalbaba
+      - name: produce-step
+        image: alpine
+        results:
+          - name: result2
+            type: string
+        script: |
+          echo -n "foo" | tee $(step.results.result2.path)
+      - name: run-based-on-step-results
+        image: alpine
+        script: |
+          echo "wooooooo"
+        when:
+          - input: "$(steps.produce-step.results.result2)"
+            operator: in
+            values: [ "bar" ]
+    workspaces:
+      - name: custom
+```
+
+The StepState for a skipped step looks like something similar to the below:
+```yaml
+      {
+        "container": "step-run-based-on-step-results",
+        "imageID": "docker.io/library/alpine@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b",
+        "name": "run-based-on-step-results",
+        "terminated": {
+          "containerID": "containerd://bf81162e79cf66a2bbc03e3654942d3464db06ff368c0be263a8a70f363a899b",
+          "exitCode": 0,
+          "finishedAt": "2024-03-26T03:57:47Z",
+          "reason": "Completed",
+          "startedAt": "2024-03-26T03:57:47Z"
+        },
+        "terminationReason": "Skipped"
+      }
+```
+Where `terminated.exitCode` is `0` and `terminationReason` is `Skipped` to indicate the Step exited successfully and was skipped. 
+
 ### Specifying `Parameters`
 
 You can specify parameters, such as compilation flags or artifact names, that you want to supply to the `Task` at execution time.
@@ -570,7 +672,7 @@ For example, `foo.Is-Bar_` is a valid parameter name for string or array type, b
 > 2. If a parameter name contains dots (.), it must be referenced by using the [bracket notation](#substituting-parameters-and-resources) with either single or double quotes i.e. `$(params['foo.bar'])`, `$(params["foo.bar"])`. See the following example for more information.
 
 #### Parameter type
-Each declared parameter has a `type` field, which can be set to `string`, `array` (beta feature) or `object` (beta feature).
+Each declared parameter has a `type` field, which can be set to `string`, `array` or `object`.
 
 ##### `object` type
 
@@ -588,13 +690,12 @@ spec:
           type: string
 ```
 
-Refer to the [TaskRun example](../examples/v1/taskruns/beta/object-param-result.yaml) and the [PipelineRun example](../examples/v1/pipelineruns/beta/pipeline-object-param-and-result.yaml) in which `object` parameters are demonstrated.
+Refer to the [TaskRun example](../examples/v1/taskruns/object-param-result.yaml) and the [PipelineRun example](../examples/v1/pipelineruns/pipeline-object-param-and-result.yaml) in which `object` parameters are demonstrated.
 
   > NOTE:
-  > - `object` param is a `beta` feature and gated by the `alpha` or `beta` feature flag.
   > - `object` param must specify the `properties` section to define the schema i.e. what keys are available for this object param. See how to define `properties` section in the following example and the [TEP-0075](https://github.com/tektoncd/community/blob/main/teps/0075-object-param-and-result-types.md#defaulting-to-string-types-for-values).
-  > - When providing value for an `object` param, one may provide values for just a subset of keys in spec's `default`, and provide values for the rest of keys at runtime ([example](../examples/v1/taskruns/beta/object-param-result.yaml)).
-  > - When using object in variable replacement, users can only access its individual key ("child" member) of the object by its name i.e. `$(params.gitrepo.url)`. Using an entire object as a value is only allowed when the value is also an object like [this example](https://github.com/tektoncd/pipeline/blob/55665765e4de35b3a4fb541549ae8cdef0996641/examples/v1/pipelineruns/beta/pipeline-object-param-and-result.yaml#L64-L65). See more details about using object param from the [TEP-0075](https://github.com/tektoncd/community/blob/main/teps/0075-object-param-and-result-types.md#using-objects-in-variable-replacement).
+  > - When providing value for an `object` param, one may provide values for just a subset of keys in spec's `default`, and provide values for the rest of keys at runtime ([example](../examples/v1/taskruns/object-param-result.yaml)).
+  > - When using object in variable replacement, users can only access its individual key ("child" member) of the object by its name i.e. `$(params.gitrepo.url)`. Using an entire object as a value is only allowed when the value is also an object like [this example](../examples/v1/pipelineruns/pipeline-object-param-and-result.yaml). See more details about using object param from the [TEP-0075](https://github.com/tektoncd/community/blob/main/teps/0075-object-param-and-result-types.md#using-objects-in-variable-replacement).
 
 ##### `array` type
 
@@ -713,11 +814,9 @@ spec:
 ```
 
 #### Param enum
-> :seedling: **Specifying `enum` is an [alpha](additional-configs.md#alpha-features) feature.** The `enable-param-enum` feature flag must be set to `"true"` to enable this feature.
+> :seedling: **`enum` is an [alpha](additional-configs.md#alpha-features) feature.** The `enable-param-enum` feature flag must be set to `"true"` to enable this feature.
 
-> :seedling: This feature is WIP and not yet supported/implemented. Documentation to be completed.
-
-Parameter declarations can include `enum` which is a predefine set of valid values that can be accepted by the `Param`. For example, the valid/allowed values for `Param` "message" is bounded to `v1`, `v2` and `v3`:
+Parameter declarations can include `enum` which is a predefine set of valid values that can be accepted by the `Param`. If a `Param` has both `enum` and default value, the default value must be in the `enum` set. For example, the valid/allowed values for `Param` "message" is bounded to `v1`, `v2` and `v3`:
 
 ``` yaml
 apiVersion: tekton.dev/v1
@@ -729,6 +828,7 @@ spec:
   - name: message
     type: string
     enum: ["v1", "v2", "v3"]
+    default: "v1"
   steps:
   - name: build
     image: bash:latest
@@ -860,8 +960,14 @@ precise string you want returned from your `Task` into the result files that you
 The stored results can be used [at the `Task` level](./pipelines.md#passing-one-tasks-results-into-the-parameters-or-when-expressions-of-another)
 or [at the `Pipeline` level](./pipelines.md#emitting-results-from-a-pipeline).
 
+> **Note** Tekton does not enforce Task results unless there is a consumer: when a Task declares a result,
+> it may complete successfully even if no result was actually produced. When a Task that declares results is
+> used in a Pipeline, and a component of the Pipeline attempts to consume the Task's result, if the result
+> was not produced the pipeline will fail. [TEP-0048](https://github.com/tektoncd/community/blob/main/teps/0048-task-results-without-results.md)
+> propopses introducing default values for results to help Pipeline authors manage this case.
+
 #### Emitting Object `Results`
-Emitting a task result of type `object` is a `beta` feature implemented based on the
+Emitting a task result of type `object` is implemented based on the
 [TEP-0075](https://github.com/tektoncd/community/blob/main/teps/0075-object-param-and-result-types.md#emitting-object-results).
 You can initialize `object` results from a `task` using JSON escaped string. For example, to assign the following data to an object result:
 
@@ -1019,7 +1125,7 @@ As a general rule-of-thumb, if a result needs to be larger than a kilobyte, you 
 
 #### Larger `Results` using sidecar logs
 
-This is an alpha feature which is guarded behind its own feature flag.  The `results-from` feature flag must be set to
+This is a beta feature which is guarded behind its own feature flag.  The `results-from` feature flag must be set to
 [`"sidecar-logs"`](./install.md#enabling-larger-results-using-sidecar-logs) to enable larger results using sidecar logs.
 
 Instead of using termination messages to store results, the taskrun controller injects a sidecar container which monitors
@@ -1108,6 +1214,11 @@ to run alongside the `Steps` in your `Task`. You can use `Sidecars` to provide a
 [Docker in Docker](https://hub.docker.com/_/docker) or running a mock API server that your app can hit during testing.
 `Sidecars` spin up before your `Task` executes and are deleted after the `Task` execution completes.
 For further information, see [`Sidecars` in `TaskRuns`](taskruns.md#specifying-sidecars).
+
+**Note**: Starting in v0.62 you can enable native Kubernetes sidecar support using the `enable-kubernetes-sidecar` feature flag ([see instructions](./additional-configs.md#customizing-the-pipelines-controller-behavior)). If kubernetes does not wait for your sidecar application to be ready, use a `startupProbe` to help kubernetes identify when it is ready.
+
+Refer to the detailed instructions listed in [additional config](additional-configs.md#enabling-larger-results-using-sidecar-logs)
+to learn how to enable this feature.
 
 In the example below, a `Step` uses a Docker-in-Docker `Sidecar` to build a Docker image:
 

@@ -75,6 +75,43 @@ spec:
   - image: foo
   - image: bar
 `
+	stepResultTaskYAML := `
+metadata:
+  name: foo
+  namespace: bar
+  generation: 1
+spec:
+  displayName: "task-display-name"
+  description: test
+  steps:
+  - image: foo
+    results:
+      - name: res
+        type: string
+      - name: arr
+        type: array
+      - name: obj
+        type: object
+        properties:
+          key:
+            type: string
+`
+	stepWhenTaskYAML := `
+metadata:
+  name: foo
+  namespace: bar
+spec:
+  displayName: "task-step-when"
+  description: test
+  steps:
+    - image: foo
+      name: should-execute
+      image: bash:latest
+      when:
+       - input: "$(workspaces.custom.bound)"
+         operator: in
+         values: ["true"]
+`
 	stepActionTaskYAML := `
 metadata:
   name: foo
@@ -306,6 +343,12 @@ spec:
 	multiStepTaskV1beta1 := parse.MustParseV1beta1Task(t, multiStepTaskYAML)
 	multiStepTaskV1 := parse.MustParseV1Task(t, multiStepTaskYAML)
 
+	stepResultTaskV1beta1 := parse.MustParseV1beta1Task(t, stepResultTaskYAML)
+	stepResultTaskV1 := parse.MustParseV1Task(t, stepResultTaskYAML)
+
+	stepWhenTaskV1beta1 := parse.MustParseV1beta1Task(t, stepWhenTaskYAML)
+	stepWhenTaskV1 := parse.MustParseV1Task(t, stepWhenTaskYAML)
+
 	stepActionTaskV1beta1 := parse.MustParseV1beta1Task(t, stepActionTaskYAML)
 	stepActionTaskV1 := parse.MustParseV1Task(t, stepActionTaskYAML)
 
@@ -347,6 +390,14 @@ spec:
 		name:        "task conversion all non deprecated fields",
 		v1beta1Task: taskWithAllNoDeprecatedFieldsV1beta1,
 		v1Task:      taskWithAllNoDeprecatedFieldsV1,
+	}, {
+		name:        "step results in task",
+		v1beta1Task: stepResultTaskV1beta1,
+		v1Task:      stepResultTaskV1,
+	}, {
+		name:        "step when in task",
+		v1beta1Task: stepWhenTaskV1beta1,
+		v1Task:      stepWhenTaskV1,
 	}, {
 		name:        "step action in task",
 		v1beta1Task: stepActionTaskV1beta1,

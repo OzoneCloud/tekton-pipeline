@@ -266,6 +266,10 @@ func (s *pullService) ClearMilestone(ctx context.Context, repo string, prID int)
 	return res, err
 }
 
+func (s *pullService) DeletePullRequest(ctx context.Context, repo string, prID int) (*scm.Response, error) {
+	return nil, scm.ErrNotSupported
+}
+
 type updateMergeRequestOptions struct {
 	Title              *string `json:"title,omitempty"`
 	Description        *string `json:"description,omitempty"`
@@ -307,6 +311,7 @@ type pr struct {
 	Labels          []*string `json:"labels"`
 	Link            string    `json:"web_url"`
 	WIP             bool      `json:"work_in_progress"`
+	Draft           bool      `json:"draft"`
 	Author          user      `json:"author"`
 	MergeStatus     string    `json:"merge_status"`
 	SourceBranch    string    `json:"source_branch"`
@@ -411,7 +416,7 @@ func (s *pullService) convertPullRequest(ctx context.Context, from *pr) (*scm.Pu
 		Source:         from.SourceBranch,
 		Target:         from.TargetBranch,
 		Link:           from.Link,
-		Draft:          from.WIP,
+		Draft:          from.WIP || from.Draft,
 		Closed:         from.State != "opened",
 		Merged:         from.State == "merged",
 		Mergeable:      scm.ToMergeableState(from.MergeStatus) == scm.MergeableStateMergeable,

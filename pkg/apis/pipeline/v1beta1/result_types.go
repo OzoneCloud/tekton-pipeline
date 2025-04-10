@@ -35,6 +35,8 @@ type TaskResult struct {
 
 	// Value the expression used to retrieve the value of the result from an underlying Step.
 	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Value *ResultValue `json:"value,omitempty"`
 }
 
@@ -49,8 +51,13 @@ type TaskRunResult struct {
 	Type ResultsType `json:"type,omitempty"`
 
 	// Value the given value of the result
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
 	Value ResultValue `json:"value"`
 }
+
+// TaskRunStepResult is a type alias of TaskRunResult
+type TaskRunStepResult = TaskRunResult
 
 // ResultValue is a type alias of ParamValue
 type ResultValue = ParamValue

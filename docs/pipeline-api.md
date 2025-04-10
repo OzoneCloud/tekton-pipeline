@@ -304,6 +304,22 @@ resource being requested. For example: repo URL, commit SHA,
 path to file, the kind of authentication to leverage, etc.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>url</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>URL is the runtime url passed to the resolver
+to help it figure out how to resolver the resource being
+requested.
+This is currently at an ALPHA stability level and subject to
+alpha API compatibility policies.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -356,6 +372,22 @@ ResolutionRequest CRD.</p>
 the resolver to help it figure out how to resolve the
 resource being requested. For example: repo URL, commit SHA,
 path to file, the kind of authentication to leverage, etc.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>url</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>URL is the runtime url passed to the resolver
+to help it figure out how to resolver the resource being
+requested.
+This is currently at an ALPHA stability level and subject to
+alpha API compatibility policies.</p>
 </td>
 </tr>
 </tbody>
@@ -733,6 +765,9 @@ PipelineSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying PipelineSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Pipeline.spec (API version: tekton.dev/v1)</p>
 </td>
 </tr>
 <tr>
@@ -970,7 +1005,8 @@ source mounted into /workspace.</p>
 </td>
 <td>
 <p>Volumes is a collection of volumes that are available to mount into the
-steps of the build.</p>
+steps of the build.
+See Pod.spec.volumes (API version: v1)</p>
 </td>
 </tr>
 <tr>
@@ -1155,6 +1191,9 @@ TaskSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying TaskSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Task.spec (API version: tekton.dev/v1)</p>
 </td>
 </tr>
 <tr>
@@ -1304,6 +1343,148 @@ TaskRunStatus
 </tr>
 </tbody>
 </table>
+<h3 id="tekton.dev/v1.Algorithm">Algorithm
+(<code>string</code> alias)</h3>
+<div>
+<p>Algorithm Standard cryptographic hash algorithm</p>
+</div>
+<h3 id="tekton.dev/v1.Artifact">Artifact
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1.Artifacts">Artifacts</a>, <a href="#tekton.dev/v1.StepState">StepState</a>)
+</p>
+<div>
+<p>TaskRunStepArtifact represents an artifact produced or used by a step within a task run.
+It directly uses the Artifact type for its structure.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The artifact&rsquo;s identifying category name</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>values</code><br/>
+<em>
+<a href="#tekton.dev/v1.ArtifactValue">
+[]ArtifactValue
+</a>
+</em>
+</td>
+<td>
+<p>A collection of values related to the artifact</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>buildOutput</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Indicate if the artifact is a build output or a by-product</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1.ArtifactValue">ArtifactValue
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1.Artifact">Artifact</a>)
+</p>
+<div>
+<p>ArtifactValue represents a specific value or data element within an Artifact.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>digest</code><br/>
+<em>
+map[github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.Algorithm]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uri</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Algorithm-specific digests for verifying the content (e.g., SHA256)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1.Artifacts">Artifacts
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1.TaskRunStatusFields">TaskRunStatusFields</a>)
+</p>
+<div>
+<p>Artifacts represents the collection of input and output artifacts associated with
+a task run or a similar process. Artifacts in this context are units of data or resources
+that the process either consumes as input or produces as output.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>inputs</code><br/>
+<em>
+<a href="#tekton.dev/v1.Artifact">
+[]Artifact
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>outputs</code><br/>
+<em>
+<a href="#tekton.dev/v1.Artifact">
+[]Artifact
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="tekton.dev/v1.ChildStatusReference">ChildStatusReference
 </h3>
 <p>
@@ -1329,6 +1510,18 @@ string
 </td>
 <td>
 <p>Name is the name of the TaskRun or Run this is referencing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>displayName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>DisplayName is a user-facing name of the pipelineTask that may be
+used to populate a UI.</p>
 </td>
 </tr>
 <tr>
@@ -1709,7 +1902,7 @@ If Enum is not set, no input validation is performed for the param.</p>
 <h3 id="tekton.dev/v1.ParamSpecs">ParamSpecs
 (<code>[]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.ParamSpec</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineSpec">PipelineSpec</a>, <a href="#tekton.dev/v1.TaskSpec">TaskSpec</a>, <a href="#tekton.dev/v1alpha1.StepActionSpec">StepActionSpec</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineSpec">PipelineSpec</a>, <a href="#tekton.dev/v1.TaskSpec">TaskSpec</a>, <a href="#tekton.dev/v1alpha1.StepActionSpec">StepActionSpec</a>, <a href="#tekton.dev/v1beta1.StepActionSpec">StepActionSpec</a>)
 </p>
 <div>
 <p>ParamSpecs is a list of ParamSpec</p>
@@ -1968,6 +2161,11 @@ all of the running TaskRuns as cancelled failed.</p>
 <td><p>ReasonCouldntGetPipeline indicates that the reason for the failure status is that the
 associated Pipeline couldn&rsquo;t be retrieved</p>
 </td>
+</tr><tr><td><p>&#34;CouldntGetPipelineResult&#34;</p></td>
+<td><p>PipelineRunReasonCouldntGetPipelineResult indicates that the pipeline fails to retrieve the
+referenced result. This could be due to failed TaskRuns or Runs that were supposed to produce
+the results</p>
+</td>
 </tr><tr><td><p>&#34;CouldntGetTask&#34;</p></td>
 <td><p>ReasonCouldntGetTask indicates that the reason for the failure status is that the
 associated Pipeline&rsquo;s Tasks couldn&rsquo;t all be retrieved</p>
@@ -1997,6 +2195,13 @@ associated Pipeline is an invalid graph (a.k.a wrong order, cycle, …)</p>
 </tr><tr><td><p>&#34;InvalidMatrixParameterTypes&#34;</p></td>
 <td><p>ReasonInvalidMatrixParameterTypes indicates a matrix contains invalid parameter types</p>
 </td>
+</tr><tr><td><p>&#34;InvalidParamValue&#34;</p></td>
+<td><p>PipelineRunReasonInvalidParamValue indicates that the PipelineRun Param input value is not allowed.</p>
+</td>
+</tr><tr><td><p>&#34;InvalidPipelineResultReference&#34;</p></td>
+<td><p>PipelineRunReasonInvalidPipelineResultReference indicates a pipeline result was declared
+by the pipeline but not initialized in the pipelineTask</p>
+</td>
 </tr><tr><td><p>&#34;InvalidTaskResultReference&#34;</p></td>
 <td><p>ReasonInvalidTaskResultReference indicates a task result was declared
 but was not initialized by that task</p>
@@ -2014,8 +2219,7 @@ PipelineRun has provided an invalid binding.</p>
 misses some keys required for the object param declared in Pipeline spec.</p>
 </td>
 </tr><tr><td><p>&#34;ParamArrayIndexingInvalid&#34;</p></td>
-<td><p>ReasonParamArrayIndexingInvalid indicates that the use of param array indexing is not under correct api fields feature gate
-or the array is out of bound.</p>
+<td><p>ReasonParamArrayIndexingInvalid indicates that the use of param array indexing is out of bound.</p>
 </td>
 </tr><tr><td><p>&#34;ParameterMissing&#34;</p></td>
 <td><p>ReasonParameterMissing indicates that the reason for the failure status is that the
@@ -2199,6 +2403,9 @@ PipelineSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying PipelineSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Pipeline.spec (API version: tekton.dev/v1)</p>
 </td>
 </tr>
 <tr>
@@ -2415,7 +2622,8 @@ PipelineSpec
 </em>
 </td>
 <td>
-<p>PipelineRunSpec contains the exact spec used to instantiate the run</p>
+<p>PipelineSpec contains the exact spec used to instantiate the run.
+See Pipeline.spec (API version: tekton.dev/v1)</p>
 </td>
 </tr>
 <tr>
@@ -2737,7 +2945,10 @@ EmbeddedTask
 </td>
 <td>
 <em>(Optional)</em>
-<p>TaskSpec is a specification of a task</p>
+<p>TaskSpec is a specification of a task
+Specifying TaskSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Task.spec (API version: tekton.dev/v1)</p>
 </td>
 </tr>
 <tr>
@@ -2864,7 +3075,10 @@ PipelineSpec
 <td>
 <em>(Optional)</em>
 <p>PipelineSpec is a specification of a pipeline
-Note: PipelineSpec is in preview mode and not yet supported</p>
+Note: PipelineSpec is in preview mode and not yet supported
+Specifying PipelineSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Pipeline.spec (API version: tekton.dev/v1)</p>
 </td>
 </tr>
 <tr>
@@ -2879,9 +3093,7 @@ PipelineTaskOnErrorType
 <td>
 <em>(Optional)</em>
 <p>OnError defines the exiting behavior of a PipelineRun on error
-can be set to [ continue | stopAndFail ]
-Note: OnError is in preview mode and not yet supported
-TODO(#7165)</p>
+can be set to [ continue | stopAndFail ]</p>
 </td>
 </tr>
 </tbody>
@@ -3214,7 +3426,7 @@ this field is false and so declared workspaces are required.</p>
 <h3 id="tekton.dev/v1.PropertySpec">PropertySpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1.ParamSpec">ParamSpec</a>, <a href="#tekton.dev/v1.TaskResult">TaskResult</a>, <a href="#tekton.dev/v1alpha1.StepActionResult">StepActionResult</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1.ParamSpec">ParamSpec</a>, <a href="#tekton.dev/v1.StepResult">StepResult</a>, <a href="#tekton.dev/v1.TaskResult">TaskResult</a>)
 </p>
 <div>
 <p>PropertySpec defines the struct for object keys</p>
@@ -3244,7 +3456,7 @@ ParamType
 <h3 id="tekton.dev/v1.Provenance">Provenance
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineRunStatusFields">PipelineRunStatusFields</a>, <a href="#tekton.dev/v1.TaskRunStatusFields">TaskRunStatusFields</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineRunStatusFields">PipelineRunStatusFields</a>, <a href="#tekton.dev/v1.StepState">StepState</a>, <a href="#tekton.dev/v1.TaskRunStatusFields">TaskRunStatusFields</a>)
 </p>
 <div>
 <p>Provenance contains metadata about resources used in the TaskRun/PipelineRun
@@ -3506,7 +3718,7 @@ string
 <h3 id="tekton.dev/v1.ResultsType">ResultsType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineResult">PipelineResult</a>, <a href="#tekton.dev/v1.TaskResult">TaskResult</a>, <a href="#tekton.dev/v1.TaskRunResult">TaskRunResult</a>, <a href="#tekton.dev/v1alpha1.StepActionResult">StepActionResult</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineResult">PipelineResult</a>, <a href="#tekton.dev/v1.StepResult">StepResult</a>, <a href="#tekton.dev/v1.TaskResult">TaskResult</a>, <a href="#tekton.dev/v1.TaskRunResult">TaskRunResult</a>)
 </p>
 <div>
 <p>ResultsType indicates the type of a result;
@@ -3569,9 +3781,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Image reference name.
-More info: <a href="https://kubernetes.io/docs/concepts/containers/images">https://kubernetes.io/docs/concepts/containers/images</a>
-This field is optional to allow higher level config management to default or override
-container images in workload controllers like Deployments and StatefulSets.</p>
+More info: <a href="https://kubernetes.io/docs/concepts/containers/images">https://kubernetes.io/docs/concepts/containers/images</a></p>
 </td>
 </tr>
 <tr>
@@ -3942,6 +4152,23 @@ for this field to be supported.</p>
 exclusive access to. Adding a workspace to this list means that any
 other Step or Sidecar that does not also request this Workspace will
 not have access to it.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>restartPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#containerrestartpolicy-v1-core">
+Kubernetes core/v1.ContainerRestartPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RestartPolicy refers to kubernetes RestartPolicy. It can only be set for an
+initContainer and must have it&rsquo;s policy set to &ldquo;Always&rdquo;. It is currently
+left optional to help support Kubernetes versions prior to 1.29 when this feature
+was introduced.</p>
 </td>
 </tr>
 </tbody>
@@ -4441,6 +4668,38 @@ Params
 <p>Params declares parameters passed to this step action.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>results</code><br/>
+<em>
+<a href="#tekton.dev/v1.StepResult">
+[]StepResult
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Results declares StepResults produced by the Step.</p>
+<p>This is field is at an ALPHA stability level and gated by &ldquo;enable-step-actions&rdquo; feature flag.</p>
+<p>It can be used in an inlined Step when used to store Results to $(step.results.resultName.path).
+It cannot be used when referencing StepActions using [v1.Step.Ref].
+The Results declared by the StepActions will be stored here instead.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>when</code><br/>
+<em>
+<a href="#tekton.dev/v1.WhenExpressions">
+WhenExpressions
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>When is a list of when expressions that need to be true for the task to run</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="tekton.dev/v1.StepOutputConfig">StepOutputConfig
@@ -4469,6 +4728,76 @@ string
 <td>
 <em>(Optional)</em>
 <p>Path to duplicate stdout stream to on container&rsquo;s local filesystem.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1.StepResult">StepResult
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1.Step">Step</a>, <a href="#tekton.dev/v1alpha1.StepActionSpec">StepActionSpec</a>, <a href="#tekton.dev/v1beta1.Step">Step</a>, <a href="#tekton.dev/v1beta1.StepActionSpec">StepActionSpec</a>)
+</p>
+<div>
+<p>StepResult used to describe the Results of a Step.</p>
+<p>This is field is at an BETA stability level and gated by &ldquo;enable-step-actions&rdquo; feature flag.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name the given name</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="#tekton.dev/v1.ResultsType">
+ResultsType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The possible types are &lsquo;string&rsquo;, &lsquo;array&rsquo;, and &lsquo;object&rsquo;, with &lsquo;string&rsquo; as the default.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>properties</code><br/>
+<em>
+<a href="#tekton.dev/v1.PropertySpec">
+map[string]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.PropertySpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Properties is the JSON Schema properties to support key-value pairs results.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Description is a human-readable description of the result</p>
 </td>
 </tr>
 </tbody>
@@ -4534,6 +4863,64 @@ string
 <td>
 </td>
 </tr>
+<tr>
+<td>
+<code>results</code><br/>
+<em>
+<a href="#tekton.dev/v1.TaskRunResult">
+[]TaskRunResult
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>provenance</code><br/>
+<em>
+<a href="#tekton.dev/v1.Provenance">
+Provenance
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>terminationReason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>inputs</code><br/>
+<em>
+<a href="#tekton.dev/v1.Artifact">
+[]Artifact
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>outputs</code><br/>
+<em>
+<a href="#tekton.dev/v1.Artifact">
+[]Artifact
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="tekton.dev/v1.StepTemplate">StepTemplate
@@ -4562,9 +4949,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>Image reference name.
-More info: <a href="https://kubernetes.io/docs/concepts/containers/images">https://kubernetes.io/docs/concepts/containers/images</a>
-This field is optional to allow higher level config management to default or override
-container images in workload controllers like Deployments and StatefulSets.</p>
+More info: <a href="https://kubernetes.io/docs/concepts/containers/images">https://kubernetes.io/docs/concepts/containers/images</a></p>
 </td>
 </tr>
 <tr>
@@ -4762,6 +5147,17 @@ string
 <em>(Optional)</em>
 <p>if enabled, pause TaskRun on failure of a step
 failed step will not exit</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>beforeSteps</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 </td>
 </tr>
 </tbody>
@@ -5026,8 +5422,27 @@ reasons that emerge from underlying resources are not included here</p>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>TaskRunReasonFailed is the reason set when the TaskRun completed with a failure</p>
 </td>
+</tr><tr><td><p>&#34;TaskRunResolutionFailed&#34;</p></td>
+<td><p>TaskRunReasonFailedResolution indicated that the reason for failure status is
+that references within the TaskRun could not be resolved</p>
+</td>
+</tr><tr><td><p>&#34;TaskRunValidationFailed&#34;</p></td>
+<td><p>TaskRunReasonFailedValidation indicated that the reason for failure status is
+that taskrun failed runtime validation</p>
+</td>
+</tr><tr><td><p>&#34;FailureIgnored&#34;</p></td>
+<td><p>TaskRunReasonFailureIgnored is the reason set when the Taskrun has failed due to pod execution error and the failure is ignored for the owning PipelineRun.
+TaskRuns failed due to reconciler/validation error should not use this reason.</p>
+</td>
 </tr><tr><td><p>&#34;TaskRunImagePullFailed&#34;</p></td>
 <td><p>TaskRunReasonImagePullFailed is the reason set when the step of a task fails due to image not being pulled</p>
+</td>
+</tr><tr><td><p>&#34;InvalidParamValue&#34;</p></td>
+<td><p>TaskRunReasonInvalidParamValue indicates that the TaskRun Param input value is not allowed.</p>
+</td>
+</tr><tr><td><p>&#34;ResourceVerificationFailed&#34;</p></td>
+<td><p>TaskRunReasonResourceVerificationFailed indicates that the task fails the trusted resource verification,
+it could be the content has changed, signature is invalid or public key is invalid</p>
 </td>
 </tr><tr><td><p>&#34;TaskRunResultLargerThanAllowedLimit&#34;</p></td>
 <td><p>TaskRunReasonResultLargerThanAllowedLimit is the reason set when one of the results exceeds its maximum allowed limit of 1 KB</p>
@@ -5038,8 +5453,15 @@ reasons that emerge from underlying resources are not included here</p>
 </tr><tr><td><p>&#34;Started&#34;</p></td>
 <td><p>TaskRunReasonStarted is the reason set when the TaskRun has just started</p>
 </td>
+</tr><tr><td><p>&#34;TaskRunStopSidecarFailed&#34;</p></td>
+<td><p>TaskRunReasonStopSidecarFailed indicates that the sidecar is not properly stopped.</p>
+</td>
 </tr><tr><td><p>&#34;Succeeded&#34;</p></td>
 <td><p>TaskRunReasonSuccessful is the reason set when the TaskRun completed successfully</p>
+</td>
+</tr><tr><td><p>&#34;TaskValidationFailed&#34;</p></td>
+<td><p>TaskRunReasonTaskFailedValidation indicated that the reason for failure status is
+that task failed runtime validation</p>
 </td>
 </tr><tr><td><p>&#34;TaskRunTimeout&#34;</p></td>
 <td><p>TaskRunReasonTimedOut is the reason set when one TaskRun execution has timed out</p>
@@ -5052,10 +5474,10 @@ reasons that emerge from underlying resources are not included here</p>
 <h3 id="tekton.dev/v1.TaskRunResult">TaskRunResult
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1.TaskRunStatusFields">TaskRunStatusFields</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1.StepState">StepState</a>, <a href="#tekton.dev/v1.TaskRunStatusFields">TaskRunStatusFields</a>)
 </p>
 <div>
-<p>TaskRunResult used to describe the results of a task</p>
+<p>TaskRunStepResult is a type alias of TaskRunResult</p>
 </div>
 <table>
 <thead>
@@ -5226,6 +5648,9 @@ TaskSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying TaskSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Task.spec (API version: tekton.dev/v1)</p>
 </td>
 </tr>
 <tr>
@@ -5540,6 +5965,20 @@ All TaskRunStatus stored in RetriesStatus will have no date within the RetriesSt
 </tr>
 <tr>
 <td>
+<code>artifacts</code><br/>
+<em>
+<a href="#tekton.dev/v1.Artifacts">
+Artifacts
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Artifacts are the list of artifacts written out by the task&rsquo;s containers</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>sidecars</code><br/>
 <em>
 <a href="#tekton.dev/v1.SidecarState">
@@ -5717,7 +6156,8 @@ source mounted into /workspace.</p>
 </td>
 <td>
 <p>Volumes is a collection of volumes that are available to mount into the
-steps of the build.</p>
+steps of the build.
+See Pod.spec.volumes (API version: v1)</p>
 </td>
 </tr>
 <tr>
@@ -5903,7 +6343,7 @@ More info about CEL syntax: <a href="https://github.com/google/cel-spec/blob/mas
 <h3 id="tekton.dev/v1.WhenExpressions">WhenExpressions
 (<code>[]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.WhenExpression</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineTask">PipelineTask</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1.PipelineTask">PipelineTask</a>, <a href="#tekton.dev/v1.Step">Step</a>)
 </p>
 <div>
 <p>WhenExpressions are used to specify whether a Task should be executed or skipped
@@ -5961,7 +6401,8 @@ Kubernetes core/v1.PersistentVolumeClaim
 <td>
 <em>(Optional)</em>
 <p>VolumeClaimTemplate is a template for a claim that will be created in the same namespace.
-The PipelineRun controller is responsible for creating a unique claim for each instance of PipelineRun.</p>
+The PipelineRun controller is responsible for creating a unique claim for each instance of PipelineRun.
+See PersistentVolumeClaim (API version: v1)</p>
 </td>
 </tr>
 <tr>
@@ -6520,6 +6961,19 @@ StepActionSpec
 <table>
 <tr>
 <td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Description is a user-facing description of the stepaction that may be
+used to populate a UI.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>image</code><br/>
 <em>
 string
@@ -6599,6 +7053,21 @@ string
 </tr>
 <tr>
 <td>
+<code>workingDir</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Step&rsquo;s working directory.
+If not specified, the container runtime&rsquo;s default will be used, which
+might be configured in the container image.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>params</code><br/>
 <em>
 <a href="#tekton.dev/v1.ParamSpecs">
@@ -6616,8 +7085,8 @@ Params must be supplied as inputs in Steps unless they declare a defaultvalue.</
 <td>
 <code>results</code><br/>
 <em>
-<a href="#tekton.dev/v1alpha1.StepActionResult">
-[]StepActionResult
+<a href="#tekton.dev/v1.StepResult">
+[]StepResult
 </a>
 </em>
 </td>
@@ -7323,76 +7792,6 @@ Refer Go&rsquo;s ParseDuration documentation for expected format: <a href="https
 <div>
 <p>StepActionObject is implemented by StepAction</p>
 </div>
-<h3 id="tekton.dev/v1alpha1.StepActionResult">StepActionResult
-</h3>
-<p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.StepActionSpec">StepActionSpec</a>)
-</p>
-<div>
-<p>StepActionResult used to describe the results of a task</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name the given name</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-<a href="#tekton.dev/v1.ResultsType">
-ResultsType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Type is the user-specified type of the result. The possible type
-is currently &ldquo;string&rdquo; and will support &ldquo;array&rdquo; in following work.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>properties</code><br/>
-<em>
-<a href="#tekton.dev/v1.PropertySpec">
-map[string]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.PropertySpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Properties is the JSON Schema properties to support key-value pairs results.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>description</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Description is a human-readable description of the result</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="tekton.dev/v1alpha1.StepActionSpec">StepActionSpec
 </h3>
 <p>
@@ -7409,6 +7808,19 @@ string
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Description is a user-facing description of the stepaction that may be
+used to populate a UI.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>image</code><br/>
@@ -7490,6 +7902,21 @@ string
 </tr>
 <tr>
 <td>
+<code>workingDir</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Step&rsquo;s working directory.
+If not specified, the container runtime&rsquo;s default will be used, which
+might be configured in the container image.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>params</code><br/>
 <em>
 <a href="#tekton.dev/v1.ParamSpecs">
@@ -7507,8 +7934,8 @@ Params must be supplied as inputs in Steps unless they declare a defaultvalue.</
 <td>
 <code>results</code><br/>
 <em>
-<a href="#tekton.dev/v1alpha1.StepActionResult">
-[]StepActionResult
+<a href="#tekton.dev/v1.StepResult">
+[]StepResult
 </a>
 </em>
 </td>
@@ -8061,6 +8488,8 @@ Resource Types:
 </li><li>
 <a href="#tekton.dev/v1beta1.PipelineRun">PipelineRun</a>
 </li><li>
+<a href="#tekton.dev/v1beta1.StepAction">StepAction</a>
+</li><li>
 <a href="#tekton.dev/v1beta1.Task">Task</a>
 </li><li>
 <a href="#tekton.dev/v1beta1.TaskRun">TaskRun</a>
@@ -8212,7 +8641,8 @@ source mounted into /workspace.</p>
 </td>
 <td>
 <p>Volumes is a collection of volumes that are available to mount into the
-steps of the build.</p>
+steps of the build.
+See Pod.spec.volumes (API version: v1)</p>
 </td>
 </tr>
 <tr>
@@ -8736,6 +9166,9 @@ PipelineSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying PipelineSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Pipeline.spec (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -8882,6 +9315,240 @@ PipelineRunStatus
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1beta1.StepAction">StepAction
+</h3>
+<div>
+<p>StepAction represents the actionable components of Step.
+The Step can only reference it from the cluster or using remote resolution.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>
+tekton.dev/v1beta1
+</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>StepAction</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.StepActionSpec">
+StepActionSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Spec holds the desired state of the Step from the client</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Description is a user-facing description of the stepaction that may be
+used to populate a UI.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Image reference name to run for this StepAction.
+More info: <a href="https://kubernetes.io/docs/concepts/containers/images">https://kubernetes.io/docs/concepts/containers/images</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Entrypoint array. Not executed within a shell.
+The image&rsquo;s ENTRYPOINT is used if this is not provided.
+Variable references $(VAR_NAME) are expanded using the container&rsquo;s environment. If a variable
+cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. &ldquo;$$(VAR_NAME)&rdquo; will
+produce the string literal &ldquo;$(VAR_NAME)&rdquo;. Escaped references will never be expanded, regardless
+of whether the variable exists or not. Cannot be updated.
+More info: <a href="https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell">https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>args</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Arguments to the entrypoint.
+The image&rsquo;s CMD is used if this is not provided.
+Variable references $(VAR_NAME) are expanded using the container&rsquo;s environment. If a variable
+cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. &ldquo;$$(VAR_NAME)&rdquo; will
+produce the string literal &ldquo;$(VAR_NAME)&rdquo;. Escaped references will never be expanded, regardless
+of whether the variable exists or not. Cannot be updated.
+More info: <a href="https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell">https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to set in the container.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>script</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Script is the contents of an executable file to execute.</p>
+<p>If Script is not empty, the Step cannot have an Command and the Args will be passed to the Script.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>workingDir</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Step&rsquo;s working directory.
+If not specified, the container runtime&rsquo;s default will be used, which
+might be configured in the container image.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>params</code><br/>
+<em>
+<a href="#tekton.dev/v1.ParamSpecs">
+ParamSpecs
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Params is a list of input parameters required to run the stepAction.
+Params must be supplied as inputs in Steps unless they declare a defaultvalue.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>results</code><br/>
+<em>
+<a href="#tekton.dev/v1.StepResult">
+[]StepResult
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Results are values that this StepAction can output</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>securityContext</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#securitycontext-v1-core">
+Kubernetes core/v1.SecurityContext
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SecurityContext defines the security options the Step should be run with.
+If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
+More info: <a href="https://kubernetes.io/docs/tasks/configure-pod-container/security-context/">https://kubernetes.io/docs/tasks/configure-pod-container/security-context/</a>
+The value set in StepAction will take precedence over the value from Task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Volumes to mount into the Step&rsquo;s filesystem.
+Cannot be updated.</p>
+</td>
+</tr>
+</table>
 </td>
 </tr>
 </tbody>
@@ -9034,7 +9701,8 @@ source mounted into /workspace.</p>
 </td>
 <td>
 <p>Volumes is a collection of volumes that are available to mount into the
-steps of the build.</p>
+steps of the build.
+See Pod.spec.volumes (API version: v1)</p>
 </td>
 </tr>
 <tr>
@@ -9234,6 +9902,9 @@ TaskSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying TaskSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Task.spec (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -9383,6 +10054,145 @@ TaskRunStatus
 </tr>
 </tbody>
 </table>
+<h3 id="tekton.dev/v1beta1.Algorithm">Algorithm
+(<code>string</code> alias)</h3>
+<div>
+<p>Algorithm Standard cryptographic hash algorithm</p>
+</div>
+<h3 id="tekton.dev/v1beta1.Artifact">Artifact
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.Artifacts">Artifacts</a>, <a href="#tekton.dev/v1beta1.StepState">StepState</a>)
+</p>
+<div>
+<p>TaskRunStepArtifact represents an artifact produced or used by a step within a task run.
+It directly uses the Artifact type for its structure.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The artifact&rsquo;s identifying category name</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>values</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.ArtifactValue">
+[]ArtifactValue
+</a>
+</em>
+</td>
+<td>
+<p>A collection of values related to the artifact</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>buildOutput</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<p>Indicate if the artifact is a build output or a by-product</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1beta1.ArtifactValue">ArtifactValue
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.Artifact">Artifact</a>)
+</p>
+<div>
+<p>ArtifactValue represents a specific value or data element within an Artifact.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>digest</code><br/>
+<em>
+map[github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Algorithm]string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>uri</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Algorithm-specific digests for verifying the content (e.g., SHA256)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1beta1.Artifacts">Artifacts
+</h3>
+<div>
+<p>Artifacts represents the collection of input and output artifacts associated with
+a task run or a similar process. Artifacts in this context are units of data or resources
+that the process either consumes as input or produces as output.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>inputs</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.Artifact">
+[]Artifact
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>outputs</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.Artifact">
+[]Artifact
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="tekton.dev/v1beta1.ChildStatusReference">ChildStatusReference
 </h3>
 <p>
@@ -9408,6 +10218,18 @@ string
 </td>
 <td>
 <p>Name is the name of the TaskRun or Run this is referencing.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>displayName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>DisplayName is a user-facing name of the pipelineTask that may be
+used to populate a UI.</p>
 </td>
 </tr>
 <tr>
@@ -10425,7 +11247,8 @@ string
 <td>
 <em>(Optional)</em>
 <p>Bundle url reference to a Tekton Bundle.</p>
-<p>Deprecated: Please use ResolverRef with the bundles resolver instead.</p>
+<p>Deprecated: Please use ResolverRef with the bundles resolver instead.
+The field is staying there for go client backward compatibility, but is not used/allowed anymore.</p>
 </td>
 </tr>
 <tr>
@@ -10768,6 +11591,9 @@ PipelineSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying PipelineSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Pipeline.spec (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -11061,7 +11887,8 @@ PipelineSpec
 </em>
 </td>
 <td>
-<p>PipelineRunSpec contains the exact spec used to instantiate the run</p>
+<p>PipelineSpec contains the exact spec used to instantiate the run.
+See Pipeline.spec (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -11399,7 +12226,10 @@ EmbeddedTask
 </td>
 <td>
 <em>(Optional)</em>
-<p>TaskSpec is a specification of a task</p>
+<p>TaskSpec is a specification of a task
+Specifying TaskSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Task.spec (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -11540,7 +12370,10 @@ PipelineSpec
 <td>
 <em>(Optional)</em>
 <p>PipelineSpec is a specification of a pipeline
-Note: PipelineSpec is in preview mode and not yet supported</p>
+Note: PipelineSpec is in preview mode and not yet supported
+Specifying PipelineSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Pipeline.spec (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -11555,9 +12388,7 @@ PipelineTaskOnErrorType
 <td>
 <em>(Optional)</em>
 <p>OnError defines the exiting behavior of a PipelineRun on error
-can be set to [ continue | stopAndFail ]
-Note: OnError is in preview mode and not yet supported
-TODO(#7165)</p>
+can be set to [ continue | stopAndFail ]</p>
 </td>
 </tr>
 </tbody>
@@ -12010,7 +12841,7 @@ ParamType
 <h3 id="tekton.dev/v1beta1.Provenance">Provenance
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1beta1.PipelineRunStatusFields">PipelineRunStatusFields</a>, <a href="#tekton.dev/v1beta1.TaskRunStatusFields">TaskRunStatusFields</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.PipelineRunStatusFields">PipelineRunStatusFields</a>, <a href="#tekton.dev/v1beta1.StepState">StepState</a>, <a href="#tekton.dev/v1beta1.TaskRunStatusFields">TaskRunStatusFields</a>)
 </p>
 <div>
 <p>Provenance contains metadata about resources used in the TaskRun/PipelineRun
@@ -12710,6 +13541,23 @@ other Step or Sidecar that does not also request this Workspace will
 not have access to it.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>restartPolicy</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#containerrestartpolicy-v1-core">
+Kubernetes core/v1.ContainerRestartPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RestartPolicy refers to kubernetes RestartPolicy. It can only be set for an
+initContainer and must have it&rsquo;s policy set to &ldquo;Always&rdquo;. It is currently
+left optional to help support Kubernetes versions prior to 1.29 when this feature
+was introduced.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="tekton.dev/v1beta1.SidecarState">SidecarState
@@ -13333,6 +14181,227 @@ Params
 <p>Params declares parameters passed to this step action.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>results</code><br/>
+<em>
+<a href="#tekton.dev/v1.StepResult">
+[]StepResult
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Results declares StepResults produced by the Step.</p>
+<p>This is field is at an ALPHA stability level and gated by &ldquo;enable-step-actions&rdquo; feature flag.</p>
+<p>It can be used in an inlined Step when used to store Results to $(step.results.resultName.path).
+It cannot be used when referencing StepActions using [v1beta1.Step.Ref].
+The Results declared by the StepActions will be stored here instead.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>when</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.WhenExpressions">
+WhenExpressions
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1beta1.StepActionObject">StepActionObject
+</h3>
+<div>
+<p>StepActionObject is implemented by StepAction</p>
+</div>
+<h3 id="tekton.dev/v1beta1.StepActionSpec">StepActionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.StepAction">StepAction</a>)
+</p>
+<div>
+<p>StepActionSpec contains the actionable components of a step.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Description is a user-facing description of the stepaction that may be
+used to populate a UI.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>image</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Image reference name to run for this StepAction.
+More info: <a href="https://kubernetes.io/docs/concepts/containers/images">https://kubernetes.io/docs/concepts/containers/images</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>command</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Entrypoint array. Not executed within a shell.
+The image&rsquo;s ENTRYPOINT is used if this is not provided.
+Variable references $(VAR_NAME) are expanded using the container&rsquo;s environment. If a variable
+cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. &ldquo;$$(VAR_NAME)&rdquo; will
+produce the string literal &ldquo;$(VAR_NAME)&rdquo;. Escaped references will never be expanded, regardless
+of whether the variable exists or not. Cannot be updated.
+More info: <a href="https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell">https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>args</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Arguments to the entrypoint.
+The image&rsquo;s CMD is used if this is not provided.
+Variable references $(VAR_NAME) are expanded using the container&rsquo;s environment. If a variable
+cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. &ldquo;$$(VAR_NAME)&rdquo; will
+produce the string literal &ldquo;$(VAR_NAME)&rdquo;. Escaped references will never be expanded, regardless
+of whether the variable exists or not. Cannot be updated.
+More info: <a href="https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell">https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell</a></p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>List of environment variables to set in the container.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>script</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Script is the contents of an executable file to execute.</p>
+<p>If Script is not empty, the Step cannot have an Command and the Args will be passed to the Script.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>workingDir</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Step&rsquo;s working directory.
+If not specified, the container runtime&rsquo;s default will be used, which
+might be configured in the container image.
+Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>params</code><br/>
+<em>
+<a href="#tekton.dev/v1.ParamSpecs">
+ParamSpecs
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Params is a list of input parameters required to run the stepAction.
+Params must be supplied as inputs in Steps unless they declare a defaultvalue.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>results</code><br/>
+<em>
+<a href="#tekton.dev/v1.StepResult">
+[]StepResult
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Results are values that this StepAction can output</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>securityContext</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#securitycontext-v1-core">
+Kubernetes core/v1.SecurityContext
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SecurityContext defines the security options the Step should be run with.
+If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
+More info: <a href="https://kubernetes.io/docs/tasks/configure-pod-container/security-context/">https://kubernetes.io/docs/tasks/configure-pod-container/security-context/</a>
+The value set in StepAction will take precedence over the value from Task.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeMounts</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#volumemount-v1-core">
+[]Kubernetes core/v1.VolumeMount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Volumes to mount into the Step&rsquo;s filesystem.
+Cannot be updated.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="tekton.dev/v1beta1.StepOutputConfig">StepOutputConfig
@@ -13421,6 +14490,54 @@ string
 <code>imageID</code><br/>
 <em>
 string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>results</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.TaskRunResult">
+[]TaskRunResult
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>provenance</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.Provenance">
+Provenance
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>inputs</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.Artifact">
+[]Artifact
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>outputs</code><br/>
+<em>
+<a href="#tekton.dev/v1beta1.Artifact">
+[]Artifact
+</a>
 </em>
 </td>
 <td>
@@ -13838,6 +14955,17 @@ string
 failed step will not exit</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>beforeSteps</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="tekton.dev/v1beta1.TaskKind">TaskKind
@@ -13925,7 +15053,8 @@ string
 <td>
 <em>(Optional)</em>
 <p>Bundle url reference to a Tekton Bundle.</p>
-<p>Deprecated: Please use ResolverRef with the bundles resolver instead.</p>
+<p>Deprecated: Please use ResolverRef with the bundles resolver instead.
+The field is staying there for go client backward compatibility, but is not used/allowed anymore.</p>
 </td>
 </tr>
 <tr>
@@ -14328,10 +15457,10 @@ reasons that emerge from underlying resources are not included here</p>
 <h3 id="tekton.dev/v1beta1.TaskRunResult">TaskRunResult
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1beta1.TaskRunStatusFields">TaskRunStatusFields</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.StepState">StepState</a>, <a href="#tekton.dev/v1beta1.TaskRunStatusFields">TaskRunStatusFields</a>)
 </p>
 <div>
-<p>TaskRunResult used to describe the results of a task</p>
+<p>TaskRunStepResult is a type alias of TaskRunResult</p>
 </div>
 <table>
 <thead>
@@ -14516,6 +15645,9 @@ TaskSpec
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifying TaskSpec can be disabled by setting
+<code>disable-inline-spec</code> feature flag.
+See Task.spec (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -14811,7 +15943,8 @@ CloudEventResource.</p>
 <td>
 <em>(Optional)</em>
 <p>RetriesStatus contains the history of TaskRunStatus in case of a retry in order to keep record of failures.
-All TaskRunStatus stored in RetriesStatus will have no date within the RetriesStatus as is redundant.</p>
+All TaskRunStatus stored in RetriesStatus will have no date within the RetriesStatus as is redundant.
+See TaskRun.status (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -14866,7 +15999,8 @@ TaskSpec
 </em>
 </td>
 <td>
-<p>TaskSpec contains the Spec from the dereferenced Task definition used to instantiate this TaskRun.</p>
+<p>TaskSpec contains the Spec from the dereferenced Task definition used to instantiate this TaskRun.
+See Task.spec (API version tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>
@@ -15038,7 +16172,8 @@ source mounted into /workspace.</p>
 </td>
 <td>
 <p>Volumes is a collection of volumes that are available to mount into the
-steps of the build.</p>
+steps of the build.
+See Pod.spec.volumes (API version: v1)</p>
 </td>
 </tr>
 <tr>
@@ -15224,7 +16359,7 @@ More info about CEL syntax: <a href="https://github.com/google/cel-spec/blob/mas
 <h3 id="tekton.dev/v1beta1.WhenExpressions">WhenExpressions
 (<code>[]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.WhenExpression</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1beta1.PipelineTask">PipelineTask</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.PipelineTask">PipelineTask</a>, <a href="#tekton.dev/v1beta1.Step">Step</a>)
 </p>
 <div>
 <p>WhenExpressions are used to specify whether a Task should be executed or skipped
@@ -15282,7 +16417,8 @@ Kubernetes core/v1.PersistentVolumeClaim
 <td>
 <em>(Optional)</em>
 <p>VolumeClaimTemplate is a template for a claim that will be created in the same namespace.
-The PipelineRun controller is responsible for creating a unique claim for each instance of PipelineRun.</p>
+The PipelineRun controller is responsible for creating a unique claim for each instance of PipelineRun.
+See PersistentVolumeClaim (API version: v1)</p>
 </td>
 </tr>
 <tr>
@@ -15709,7 +16845,8 @@ tasks in a pipeline.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>RetriesStatus contains the history of CustomRunStatus, in case of a retry.</p>
+<p>RetriesStatus contains the history of CustomRunStatus, in case of a retry.
+See CustomRun.status (API version: tekton.dev/v1beta1)</p>
 </td>
 </tr>
 <tr>

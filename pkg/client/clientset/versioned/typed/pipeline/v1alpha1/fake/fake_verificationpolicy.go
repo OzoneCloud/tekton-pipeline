@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,28 +35,30 @@ type FakeVerificationPolicies struct {
 	ns   string
 }
 
-var verificationpoliciesResource = schema.GroupVersionResource{Group: "tekton.dev", Version: "v1alpha1", Resource: "verificationpolicies"}
+var verificationpoliciesResource = v1alpha1.SchemeGroupVersion.WithResource("verificationpolicies")
 
-var verificationpoliciesKind = schema.GroupVersionKind{Group: "tekton.dev", Version: "v1alpha1", Kind: "VerificationPolicy"}
+var verificationpoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("VerificationPolicy")
 
 // Get takes name of the verificationPolicy, and returns the corresponding verificationPolicy object, and an error if there is any.
 func (c *FakeVerificationPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.VerificationPolicy, err error) {
+	emptyResult := &v1alpha1.VerificationPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(verificationpoliciesResource, c.ns, name), &v1alpha1.VerificationPolicy{})
+		Invokes(testing.NewGetActionWithOptions(verificationpoliciesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.VerificationPolicy), err
 }
 
 // List takes label and field selectors, and returns the list of VerificationPolicies that match those selectors.
 func (c *FakeVerificationPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.VerificationPolicyList, err error) {
+	emptyResult := &v1alpha1.VerificationPolicyList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(verificationpoliciesResource, verificationpoliciesKind, c.ns, opts), &v1alpha1.VerificationPolicyList{})
+		Invokes(testing.NewListActionWithOptions(verificationpoliciesResource, verificationpoliciesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -76,28 +77,30 @@ func (c *FakeVerificationPolicies) List(ctx context.Context, opts v1.ListOptions
 // Watch returns a watch.Interface that watches the requested verificationPolicies.
 func (c *FakeVerificationPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(verificationpoliciesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(verificationpoliciesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a verificationPolicy and creates it.  Returns the server's representation of the verificationPolicy, and an error, if there is any.
 func (c *FakeVerificationPolicies) Create(ctx context.Context, verificationPolicy *v1alpha1.VerificationPolicy, opts v1.CreateOptions) (result *v1alpha1.VerificationPolicy, err error) {
+	emptyResult := &v1alpha1.VerificationPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(verificationpoliciesResource, c.ns, verificationPolicy), &v1alpha1.VerificationPolicy{})
+		Invokes(testing.NewCreateActionWithOptions(verificationpoliciesResource, c.ns, verificationPolicy, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.VerificationPolicy), err
 }
 
 // Update takes the representation of a verificationPolicy and updates it. Returns the server's representation of the verificationPolicy, and an error, if there is any.
 func (c *FakeVerificationPolicies) Update(ctx context.Context, verificationPolicy *v1alpha1.VerificationPolicy, opts v1.UpdateOptions) (result *v1alpha1.VerificationPolicy, err error) {
+	emptyResult := &v1alpha1.VerificationPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(verificationpoliciesResource, c.ns, verificationPolicy), &v1alpha1.VerificationPolicy{})
+		Invokes(testing.NewUpdateActionWithOptions(verificationpoliciesResource, c.ns, verificationPolicy, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.VerificationPolicy), err
 }
@@ -112,7 +115,7 @@ func (c *FakeVerificationPolicies) Delete(ctx context.Context, name string, opts
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeVerificationPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(verificationpoliciesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(verificationpoliciesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.VerificationPolicyList{})
 	return err
@@ -120,11 +123,12 @@ func (c *FakeVerificationPolicies) DeleteCollection(ctx context.Context, opts v1
 
 // Patch applies the patch and returns the patched verificationPolicy.
 func (c *FakeVerificationPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.VerificationPolicy, err error) {
+	emptyResult := &v1alpha1.VerificationPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(verificationpoliciesResource, c.ns, name, pt, data, subresources...), &v1alpha1.VerificationPolicy{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(verificationpoliciesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.VerificationPolicy), err
 }

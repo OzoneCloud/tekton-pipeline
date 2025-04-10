@@ -25,29 +25,28 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	resolutionv1beta1 "github.com/tektoncd/pipeline/pkg/apis/resolution/v1beta1"
 	"github.com/tektoncd/pipeline/test/parse"
 	corev1 "k8s.io/api/core/v1"
+	apixv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	knativetest "knative.dev/pkg/test"
 	"knative.dev/pkg/test/helpers"
 )
 
 var (
-	filterLabels                      = cmpopts.IgnoreFields(metav1.ObjectMeta{}, "Labels")
-	filterAnnotations                 = cmpopts.IgnoreFields(metav1.ObjectMeta{}, "Annotations")
-	filterV1TaskRunStatus             = cmpopts.IgnoreFields(v1.TaskRunStatusFields{}, "StartTime", "CompletionTime")
-	filterV1PipelineRunStatus         = cmpopts.IgnoreFields(v1.PipelineRunStatusFields{}, "StartTime", "CompletionTime")
-	filterV1beta1TaskRunStatus        = cmpopts.IgnoreFields(v1beta1.TaskRunStatusFields{}, "StartTime", "CompletionTime")
-	filterV1beta1PipelineRunStatus    = cmpopts.IgnoreFields(v1beta1.PipelineRunStatusFields{}, "StartTime", "CompletionTime")
-	filterContainerStateTerminated    = cmpopts.IgnoreFields(corev1.ContainerStateTerminated{}, "StartedAt", "FinishedAt", "ContainerID", "Message")
-	filterV1StepState                 = cmpopts.IgnoreFields(v1.StepState{}, "Name", "ImageID", "Container")
-	filterV1beta1StepState            = cmpopts.IgnoreFields(v1beta1.StepState{}, "Name", "ImageID", "ContainerName")
-	filterV1TaskRunSA                 = cmpopts.IgnoreFields(v1.TaskRunSpec{}, "ServiceAccountName")
-	filterV1beta1TaskRunSA            = cmpopts.IgnoreFields(v1beta1.TaskRunSpec{}, "ServiceAccountName")
-	filterV1PipelineRunSA             = cmpopts.IgnoreFields(v1.PipelineTaskRunTemplate{}, "ServiceAccountName")
-	filterV1beta1PipelineRunSA        = cmpopts.IgnoreFields(v1beta1.PipelineRunSpec{}, "ServiceAccountName")
-	filterV1RefSourceImageDigest      = cmpopts.IgnoreFields(v1.RefSource{}, "Digest")
-	filterV1beta1RefSourceImageDigest = cmpopts.IgnoreFields(v1beta1.RefSource{}, "Digest")
+	filterLabels                   = cmpopts.IgnoreFields(metav1.ObjectMeta{}, "Labels")
+	filterAnnotations              = cmpopts.IgnoreFields(metav1.ObjectMeta{}, "Annotations")
+	filterV1TaskRunStatus          = cmpopts.IgnoreFields(v1.TaskRunStatusFields{}, "StartTime", "CompletionTime", "Artifacts")
+	filterV1PipelineRunStatus      = cmpopts.IgnoreFields(v1.PipelineRunStatusFields{}, "StartTime", "CompletionTime")
+	filterV1beta1TaskRunStatus     = cmpopts.IgnoreFields(v1beta1.TaskRunStatusFields{}, "StartTime", "CompletionTime")
+	filterV1beta1PipelineRunStatus = cmpopts.IgnoreFields(v1beta1.PipelineRunStatusFields{}, "StartTime", "CompletionTime")
+	filterContainerStateTerminated = cmpopts.IgnoreFields(corev1.ContainerStateTerminated{}, "StartedAt", "FinishedAt", "ContainerID", "Message")
+	filterV1StepState              = cmpopts.IgnoreFields(v1.StepState{}, "Name", "ImageID", "Container")
+	filterV1beta1StepState         = cmpopts.IgnoreFields(v1beta1.StepState{}, "Name", "ImageID", "ContainerName")
+	filterV1TaskRunSA              = cmpopts.IgnoreFields(v1.TaskRunSpec{}, "ServiceAccountName")
+	filterV1PipelineRunSA          = cmpopts.IgnoreFields(v1.PipelineTaskRunTemplate{}, "ServiceAccountName")
 
 	filterMetadata                 = []cmp.Option{filterTypeMeta, filterObjectMeta, filterAnnotations}
 	filterV1TaskRunFields          = []cmp.Option{filterTypeMeta, filterObjectMeta, filterLabels, filterAnnotations, filterCondition, filterV1TaskRunStatus, filterContainerStateTerminated, filterV1StepState}
@@ -98,7 +97,7 @@ spec:
         runAsNonRoot: true
   sidecars:
   - name: server
-    image: alpine/git:v2.26.2
+    image: mirror.gcr.io/alpine/git:v2.26.2
     command: ['/bin/bash']
     args: ['-c', 'gcloud auth activate-service-account --key-file /var/secret/bucket-secret/bucket-secret-key']
     workingDir: /dir
@@ -115,7 +114,6 @@ spec:
     volumeMounts:
     - name: messages
       mountPath: /messages
-    script: echo test
   volumes:
   - name: messages
     emptyDir: {}
@@ -175,7 +173,7 @@ spec:
         runAsNonRoot: true
   sidecars:
   - name: server
-    image: alpine/git:v2.26.2
+    image: mirror.gcr.io/alpine/git:v2.26.2
     command: ['/bin/bash']
     args: ['-c', 'gcloud auth activate-service-account --key-file /var/secret/bucket-secret/bucket-secret-key']
     workingDir: /dir
@@ -189,7 +187,6 @@ spec:
       mountPath: /messages
     securityContext:
       runAsNonRoot: true
-    script: echo test
   volumes:
     - name: messages
       emptyDir: {}
@@ -230,7 +227,7 @@ spec:
       - name: task1-result
         value: task1-val
     steps:
-      - image: alpine
+      - image: mirror.gcr.io/alpine
         onError: continue
         name: exit-with-255
         script: |
@@ -252,7 +249,7 @@ spec:
           type: string
       steps:
         - name: verify-status
-          image: ubuntu
+          image: mirror.gcr.io/ubuntu
           script: |
             if [ $(params.echoStatus) == "Succeeded" ]
             then
@@ -284,7 +281,7 @@ spec:
       - name: task1-result
         value: task1-val
     steps:
-      - image: alpine
+      - image: mirror.gcr.io/alpine
         onError: continue
         name: exit-with-255
         script: |
@@ -306,7 +303,7 @@ spec:
           type: string
       steps:
         - name: verify-status
-          image: ubuntu
+          image: mirror.gcr.io/ubuntu
           script: |
             if [ $(params.echoStatus) == "Succeeded" ]
             then
@@ -326,7 +323,7 @@ spec:
   taskSpec:
     steps:
       - name: echo
-        image: ubuntu
+        image: mirror.gcr.io/ubuntu
         script: |
           #!/usr/bin/env bash
           echo "Hello World!"
@@ -359,7 +356,7 @@ spec:
   taskSpec:
     steps:
     - computeResources: {}
-      image: ubuntu
+      image: mirror.gcr.io/ubuntu
       name: echo
       script: |
         #!/usr/bin/env bash
@@ -378,7 +375,7 @@ status:
   taskSpec:
     steps:
     - computeResources: {}
-      image: ubuntu
+      image: mirror.gcr.io/ubuntu
       name: echo
       script: |
         #!/usr/bin/env bash
@@ -414,7 +411,7 @@ spec:
   taskSpec:
     steps:
     - computeResources: {}
-      image: ubuntu
+      image: mirror.gcr.io/ubuntu
       name: echo
       script: |
         #!/usr/bin/env bash
@@ -444,7 +441,7 @@ spec:
   taskSpec:
     steps:
     - computeResources: {}
-      image: ubuntu
+      image: mirror.gcr.io/ubuntu
       name: echo
       script: |
         #!/usr/bin/env bash
@@ -460,7 +457,7 @@ status:
   taskSpec:
     steps:
     - computeResources: {}
-      image: ubuntu
+      image: mirror.gcr.io/ubuntu
       name: echo
       script: |
         #!/usr/bin/env bash
@@ -470,6 +467,7 @@ status:
   steps:
   - container: step-echo
     name: step-echo
+    terminationReason: Completed
     terminated:
       reason: Completed
 `
@@ -498,7 +496,7 @@ spec:
       taskSpec:
         steps:
         - name: echo-hello
-          image: ubuntu
+          image: mirror.gcr.io/ubuntu
           script: |
             ls $(workspaces.dir.path)
             echo hello
@@ -529,7 +527,7 @@ spec:
       taskSpec:
         steps:
         - name: echo-hello
-          image: ubuntu
+          image: mirror.gcr.io/ubuntu
           script: |
             ls $(workspaces.dir.path)
             echo hello
@@ -545,7 +543,7 @@ status:
         name: cluster-task-pipeline-4
         steps:
         - name: "echo-hello"
-          image: "ubuntu"
+          image: "mirror.gcr.io/ubuntu"
           script: |
             ls $(workspaces.dir.path)
             echo hello
@@ -583,7 +581,7 @@ spec:
       taskSpec:
         steps:
         - name: echo-hello
-          image: ubuntu
+          image: mirror.gcr.io/ubuntu
           script: |
             ls $(workspaces.dir.path)
             echo hello
@@ -616,7 +614,7 @@ spec:
       taskSpec:
         steps:
         - name: echo-hello
-          image: ubuntu
+          image: mirror.gcr.io/ubuntu
           script: |
             ls $(workspaces.dir.path)
             echo hello
@@ -640,7 +638,7 @@ status:
         name: cluster-task-pipeline-4
         steps:
         - name: "echo-hello"
-          image: "ubuntu"
+          image: "mirror.gcr.io/ubuntu"
           script: |
             ls $(workspaces.dir.path)
             echo hello
@@ -655,208 +653,43 @@ status:
       name: %s-hello-task
       pipelineTaskName: hello-task
 `
-
-	v1beta1TaskWithBundleYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  steps:
-  - name: hello
-    image: alpine
-    script: 'echo Hello'
-`
-
-	v1beta1PipelineWithBundleYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  tasks:
-  - name: hello-world
-    taskRef:
-      resolver: bundles
-      params:
-      - name: bundle
-        value: %s
-      - name: name
-        value: %s
-`
-
-	v1beta1TaskRunWithBundleYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  taskRef:
-    name: %s
-    bundle: %s
-`
-
-	v1beta1PipelineRunWithBundleYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  pipelineRef:
-    name: %s
-    bundle: %s
-`
-
-	v1TaskRunWithBundleExpectedYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  serviceAccountName: default
-  timeout: 1h
-  taskRef:
-    kind: Task
-    resolver: bundles
-    params:
-    - name: bundle
-      value: %s
-    - name: name
-      value: %s
-    - name: kind
-      value: Task
-status:
-  conditions:
-  - type: Succeeded
-    status: "True"
-    reason: "Succeeded"
-  podName: %s-pod
-  taskSpec:
-    steps:
-    - computeResources: {}
-      image: alpine
-      name: hello
-      script: 'echo Hello'
-  steps:
-  - image: alpine
-    name: hello
-    script: 'echo Hello'
-    terminated:
-      reason: Completed
-`
-
-	v1PipelineRunWithBundleExpectedYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  taskRunTemplate:
-  timeouts: 
-    pipeline: 1h
-  pipelineRef:
-    kind: Pipeline
-    resolver: bundles
-    params:
-    - name: bundle
-      value: %s
-    - name: name
-      value: %s
-    - name: kind
-      value: Pipeline
-status:
-  conditions:
-  - type: Succeeded
-    status: "True"
-    reason: "Succeeded"
-  pipelineSpec:
-    tasks:
-    - name: hello-world
-      taskRef:
-        kind: Task
-        resolver: bundles
-        params:
-        - name: bundle
-          value: %s
-        - name: name
-          value: %s
-  childReferences:
-  - apiVersion: tekton.dev/v1
-    kind: TaskRun
-    name: %s-hello-world
-    pipelineTaskName: hello-world
-`
-
-	v1beta1TaskRunWithBundleRoundTripYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  timeout: 1h
-  taskRef:
-    kind: Task
-    resolver: bundles
-    params:
-    - name: bundle
-      value: %s
-    - name: name
-      value: %s
-    - name: kind
-      value: Task
-status:
-  conditions:
-  - type: Succeeded
-    status: "True"
-    reason: "Succeeded"
-  podName: %s-pod
-  taskSpec:
-    steps:
-    - computeResources: {}
-      image: alpine
-      name: hello
-      script: 'echo Hello'
-  steps:
-  - image: alpine
-    name: hello
-    script: 'echo Hello'
-    terminated:
-      reason: Completed
-`
-
-	v1beta1PipelineRunWithBundleRoundTripYaml = `
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  timeouts: 
-    pipeline: 1h
-  pipelineRef:
-    kind: Pipeline
-    resolver: bundles
-    params:
-    - name: bundle
-      value: %s
-    - name: name
-      value: %s
-    - name: kind
-      value: Pipeline
-status:
-  conditions:
-  - type: Succeeded
-    status: "True"
-    reason: "Succeeded"
-  pipelineSpec:
-    tasks:
-    - name: hello-world
-      taskRef:
-        kind: Task
-        resolver: bundles
-        params:
-        - name: bundle
-          value: %s
-        - name: name
-          value: %s
-  childReferences:
-  - apiVersion: tekton.dev/v1
-    kind: TaskRun
-    name: %s-hello-world
-    pipelineTaskName: hello-world
-`
 )
+
+// TestCRDConversionStrategy tests if webhook conversion strategy is
+// set to versioned CRDs.
+func TestCRDConversionStrategy(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	t.Parallel()
+
+	c, namespace := setup(ctx, t)
+	knativetest.CleanupOnInterrupt(func() { tearDown(ctx, t, c, namespace) }, t.Logf)
+	defer tearDown(ctx, t, c, namespace)
+
+	kinds := []schema.GroupKind{
+		v1beta1.Kind("stepactions"),
+		v1.Kind("tasks"),
+		v1.Kind("pipelines"),
+		v1.Kind("taskruns"),
+		v1.Kind("pipelineruns"),
+		resolutionv1beta1.Kind("resolutionrequests"),
+	}
+	for _, kind := range kinds {
+		gotCRD, err := c.ApixClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), kind.String(), metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Couldn't get expected CRD %s: %s", kind, err)
+		}
+
+		if gotCRD.Spec.Conversion == nil {
+			t.Errorf("Expected custom resource %q to have conversion strategy", kind)
+		}
+		if gotCRD.Spec.Conversion.Strategy != apixv1.WebhookConverter {
+			t.Errorf("Expected custom resource %q to have conversion strategy %s, got %s", kind, apixv1.WebhookConverter, gotCRD.Spec.Conversion.Strategy)
+		}
+	}
+}
 
 // TestTaskCRDConversion first creates a v1beta1 Task CRD using v1beta1Clients and
 // requests it by v1Clients to compare with v1 if the conversion has been correctly
@@ -1151,121 +984,6 @@ func TestPipelineRunCRDConversion(t *testing.T) {
 		t.Fatalf("Error roundtrip v1beta1PipelineRunGot ConvertTo v1 = %v", err)
 	}
 	if d := cmp.Diff(v1PRRoundTripExpected, v1PRRoundTrip, filterV1PipelineRunFields...); d != "" {
-		t.Errorf("-want, +got: %v", d)
-	}
-}
-
-// TestBundleConversion tests v1beta1 bundle syntax converted into v1 since it has
-// been deprecated in v1 and it would be converted into bundle resolver in pipelineRef
-// and taskRef. It sets up a registry for a bundle of a v1beta1 Task and Pipeline
-// and uses the v1beta1 TaskRef/ PipelineRef to test the conversion from v1beta1 bundle
-// syntax to a v1 bundle resolver and then it tests roundtrip back to v1beta1 bundle
-// resolver syntax.
-func TestBundleConversion(t *testing.T) {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	t.Parallel()
-
-	c, namespace := setup(ctx, t, withRegistry, bundleFeatureFlags)
-	knativetest.CleanupOnInterrupt(func() { tearDown(ctx, t, c, namespace) }, t.Logf)
-	defer tearDown(ctx, t, c, namespace)
-
-	repo := fmt.Sprintf("%s:5000/tektonbundlessimple", getRegistryServiceIP(ctx, t, c, namespace))
-	taskName := helpers.ObjectNameForTest(t)
-	pipelineName := helpers.ObjectNameForTest(t)
-	task := parse.MustParseV1beta1Task(t, fmt.Sprintf(v1beta1TaskWithBundleYaml, taskName, namespace))
-	pipeline := parse.MustParseV1beta1Pipeline(t, fmt.Sprintf(v1beta1PipelineWithBundleYaml, pipelineName, namespace, repo, taskName))
-	setupBundle(ctx, t, c, namespace, repo, task, pipeline)
-
-	v1beta1TaskRunName := helpers.ObjectNameForTest(t)
-	v1beta1TaskRun := parse.MustParseV1beta1TaskRun(t, fmt.Sprintf(v1beta1TaskRunWithBundleYaml, v1beta1TaskRunName, namespace, taskName, repo))
-	v1TaskRunExpected := parse.MustParseV1TaskRun(t, fmt.Sprintf(v1TaskRunWithBundleExpectedYaml, v1beta1TaskRunName, namespace, repo, taskName, v1beta1TaskRunName))
-	v1beta1TaskRunRoundTripExpected := parse.MustParseV1beta1TaskRun(t, fmt.Sprintf(v1beta1TaskRunWithBundleRoundTripYaml, v1beta1TaskRunName, namespace, repo, taskName, v1beta1TaskRunName))
-
-	v1TaskRunExpected.Status.Provenance = &v1.Provenance{
-		FeatureFlags: getFeatureFlagsBaseOnAPIFlag(t),
-		RefSource: &v1.RefSource{
-			URI:        repo,
-			Digest:     map[string]string{"sha256": "a123"},
-			EntryPoint: taskName,
-		},
-	}
-	v1beta1TaskRunRoundTripExpected.Status.Provenance = &v1beta1.Provenance{
-		FeatureFlags: getFeatureFlagsBaseOnAPIFlag(t),
-		RefSource: &v1beta1.RefSource{
-			URI:        repo,
-			Digest:     map[string]string{"sha256": "a123"},
-			EntryPoint: taskName,
-		},
-	}
-
-	if _, err := c.V1beta1TaskRunClient.Create(ctx, v1beta1TaskRun, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create v1beta1 TaskRun: %s", err)
-	}
-	if err := WaitForTaskRunState(ctx, c, v1beta1TaskRunName, Succeed(v1beta1TaskRunName), v1beta1TaskRunName, "v1beta1"); err != nil {
-		t.Fatalf("Failed waiting for v1beta1 TaskRun done: %v", err)
-	}
-
-	v1TaskRunGot, err := c.V1TaskRunClient.Get(ctx, v1beta1TaskRunName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Couldn't get expected v1 TaskRun for %s: %s", v1beta1TaskRunName, err)
-	}
-	if d := cmp.Diff(v1TaskRunExpected, v1TaskRunGot, append([]cmp.Option{filterV1RefSourceImageDigest, filterV1TaskRunSA}, filterV1TaskRunFields...)...); d != "" {
-		t.Errorf("-want, +got: %v", d)
-	}
-
-	v1beta1TaskRunRoundTrip := &v1beta1.TaskRun{}
-	if err := v1beta1TaskRunRoundTrip.ConvertFrom(context.Background(), v1TaskRunGot); err != nil {
-		t.Fatalf("Failed to convert roundtrip v1beta1TaskRunGot ConvertFrom v1 = %v", err)
-	}
-	if d := cmp.Diff(v1beta1TaskRunRoundTripExpected, v1beta1TaskRunRoundTrip, append([]cmp.Option{filterV1beta1RefSourceImageDigest, filterV1beta1TaskRunSA}, filterV1beta1TaskRunFields...)...); d != "" {
-		t.Errorf("-want, +got: %v", d)
-	}
-
-	v1beta1ToV1PipelineRunName := helpers.ObjectNameForTest(t)
-	v1beta1PipelineRun := parse.MustParseV1beta1PipelineRun(t, fmt.Sprintf(v1beta1PipelineRunWithBundleYaml, v1beta1ToV1PipelineRunName, namespace, pipelineName, repo))
-	v1PipelineRunExpected := parse.MustParseV1PipelineRun(t, fmt.Sprintf(v1PipelineRunWithBundleExpectedYaml, v1beta1ToV1PipelineRunName, namespace, repo, pipelineName, repo, taskName, v1beta1ToV1PipelineRunName))
-	v1beta1PRRoundTripExpected := parse.MustParseV1beta1PipelineRun(t, fmt.Sprintf(v1beta1PipelineRunWithBundleRoundTripYaml, v1beta1ToV1PipelineRunName, namespace, repo, pipelineName, repo, taskName, v1beta1ToV1PipelineRunName))
-
-	v1PipelineRunExpected.Status.Provenance = &v1.Provenance{
-		FeatureFlags: getFeatureFlagsBaseOnAPIFlag(t),
-		RefSource: &v1.RefSource{
-			URI:        repo,
-			Digest:     map[string]string{"sha256": "a123"},
-			EntryPoint: pipelineName,
-		},
-	}
-	v1beta1PRRoundTripExpected.Status.Provenance = &v1beta1.Provenance{
-		FeatureFlags: getFeatureFlagsBaseOnAPIFlag(t),
-		RefSource: &v1beta1.RefSource{
-			URI:        repo,
-			Digest:     map[string]string{"sha256": "a123"},
-			EntryPoint: pipelineName,
-		},
-	}
-
-	if _, err := c.V1beta1PipelineRunClient.Create(ctx, v1beta1PipelineRun, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create v1beta1 PipelineRun: %s", err)
-	}
-	if err := WaitForPipelineRunState(ctx, c, v1beta1ToV1PipelineRunName, timeout, Succeed(v1beta1ToV1PipelineRunName), v1beta1ToV1PipelineRunName, "v1beta1"); err != nil {
-		t.Fatalf("Failed waiting for v1beta1 PipelineRun done: %v", err)
-	}
-
-	v1PipelineRunGot, err := c.V1PipelineRunClient.Get(ctx, v1beta1ToV1PipelineRunName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Couldn't get expected v1 PipelineRun for %s: %s", v1beta1ToV1PipelineRunName, err)
-	}
-	if d := cmp.Diff(v1PipelineRunExpected, v1PipelineRunGot, append([]cmp.Option{filterV1RefSourceImageDigest, filterV1PipelineRunSA}, filterV1PipelineRunFields...)...); d != "" {
-		t.Errorf("-want, +got: %v", d)
-	}
-
-	v1beta1PRRoundTrip := &v1beta1.PipelineRun{}
-	if err := v1beta1PRRoundTrip.ConvertFrom(context.Background(), v1PipelineRunGot); err != nil {
-		t.Fatalf("Error roundtrip v1beta1PipelineRun ConvertFrom v1PipelineRunGot = %v", err)
-	}
-	if d := cmp.Diff(v1beta1PRRoundTripExpected, v1beta1PRRoundTrip, append([]cmp.Option{filterV1beta1RefSourceImageDigest, filterV1beta1PipelineRunSA}, filterV1beta1PipelineRunFields...)...); d != "" {
 		t.Errorf("-want, +got: %v", d)
 	}
 }

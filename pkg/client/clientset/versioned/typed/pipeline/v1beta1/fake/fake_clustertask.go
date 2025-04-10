@@ -24,7 +24,6 @@ import (
 	v1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,26 +34,28 @@ type FakeClusterTasks struct {
 	Fake *FakeTektonV1beta1
 }
 
-var clustertasksResource = schema.GroupVersionResource{Group: "tekton.dev", Version: "v1beta1", Resource: "clustertasks"}
+var clustertasksResource = v1beta1.SchemeGroupVersion.WithResource("clustertasks")
 
-var clustertasksKind = schema.GroupVersionKind{Group: "tekton.dev", Version: "v1beta1", Kind: "ClusterTask"}
+var clustertasksKind = v1beta1.SchemeGroupVersion.WithKind("ClusterTask")
 
 // Get takes name of the clusterTask, and returns the corresponding clusterTask object, and an error if there is any.
 func (c *FakeClusterTasks) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ClusterTask, err error) {
+	emptyResult := &v1beta1.ClusterTask{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clustertasksResource, name), &v1beta1.ClusterTask{})
+		Invokes(testing.NewRootGetActionWithOptions(clustertasksResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.ClusterTask), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterTasks that match those selectors.
 func (c *FakeClusterTasks) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ClusterTaskList, err error) {
+	emptyResult := &v1beta1.ClusterTaskList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clustertasksResource, clustertasksKind, opts), &v1beta1.ClusterTaskList{})
+		Invokes(testing.NewRootListActionWithOptions(clustertasksResource, clustertasksKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -73,25 +74,27 @@ func (c *FakeClusterTasks) List(ctx context.Context, opts v1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested clusterTasks.
 func (c *FakeClusterTasks) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(clustertasksResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(clustertasksResource, opts))
 }
 
 // Create takes the representation of a clusterTask and creates it.  Returns the server's representation of the clusterTask, and an error, if there is any.
 func (c *FakeClusterTasks) Create(ctx context.Context, clusterTask *v1beta1.ClusterTask, opts v1.CreateOptions) (result *v1beta1.ClusterTask, err error) {
+	emptyResult := &v1beta1.ClusterTask{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clustertasksResource, clusterTask), &v1beta1.ClusterTask{})
+		Invokes(testing.NewRootCreateActionWithOptions(clustertasksResource, clusterTask, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.ClusterTask), err
 }
 
 // Update takes the representation of a clusterTask and updates it. Returns the server's representation of the clusterTask, and an error, if there is any.
 func (c *FakeClusterTasks) Update(ctx context.Context, clusterTask *v1beta1.ClusterTask, opts v1.UpdateOptions) (result *v1beta1.ClusterTask, err error) {
+	emptyResult := &v1beta1.ClusterTask{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clustertasksResource, clusterTask), &v1beta1.ClusterTask{})
+		Invokes(testing.NewRootUpdateActionWithOptions(clustertasksResource, clusterTask, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.ClusterTask), err
 }
@@ -105,7 +108,7 @@ func (c *FakeClusterTasks) Delete(ctx context.Context, name string, opts v1.Dele
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeClusterTasks) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clustertasksResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(clustertasksResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ClusterTaskList{})
 	return err
@@ -113,10 +116,11 @@ func (c *FakeClusterTasks) DeleteCollection(ctx context.Context, opts v1.DeleteO
 
 // Patch applies the patch and returns the patched clusterTask.
 func (c *FakeClusterTasks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ClusterTask, err error) {
+	emptyResult := &v1beta1.ClusterTask{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertasksResource, name, pt, data, subresources...), &v1beta1.ClusterTask{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertasksResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.ClusterTask), err
 }

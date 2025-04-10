@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,28 +35,30 @@ type FakeRuns struct {
 	ns   string
 }
 
-var runsResource = schema.GroupVersionResource{Group: "tekton.dev", Version: "v1alpha1", Resource: "runs"}
+var runsResource = v1alpha1.SchemeGroupVersion.WithResource("runs")
 
-var runsKind = schema.GroupVersionKind{Group: "tekton.dev", Version: "v1alpha1", Kind: "Run"}
+var runsKind = v1alpha1.SchemeGroupVersion.WithKind("Run")
 
 // Get takes name of the run, and returns the corresponding run object, and an error if there is any.
 func (c *FakeRuns) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Run, err error) {
+	emptyResult := &v1alpha1.Run{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(runsResource, c.ns, name), &v1alpha1.Run{})
+		Invokes(testing.NewGetActionWithOptions(runsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Run), err
 }
 
 // List takes label and field selectors, and returns the list of Runs that match those selectors.
 func (c *FakeRuns) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.RunList, err error) {
+	emptyResult := &v1alpha1.RunList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(runsResource, runsKind, c.ns, opts), &v1alpha1.RunList{})
+		Invokes(testing.NewListActionWithOptions(runsResource, runsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -76,40 +77,43 @@ func (c *FakeRuns) List(ctx context.Context, opts v1.ListOptions) (result *v1alp
 // Watch returns a watch.Interface that watches the requested runs.
 func (c *FakeRuns) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(runsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(runsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a run and creates it.  Returns the server's representation of the run, and an error, if there is any.
 func (c *FakeRuns) Create(ctx context.Context, run *v1alpha1.Run, opts v1.CreateOptions) (result *v1alpha1.Run, err error) {
+	emptyResult := &v1alpha1.Run{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(runsResource, c.ns, run), &v1alpha1.Run{})
+		Invokes(testing.NewCreateActionWithOptions(runsResource, c.ns, run, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Run), err
 }
 
 // Update takes the representation of a run and updates it. Returns the server's representation of the run, and an error, if there is any.
 func (c *FakeRuns) Update(ctx context.Context, run *v1alpha1.Run, opts v1.UpdateOptions) (result *v1alpha1.Run, err error) {
+	emptyResult := &v1alpha1.Run{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(runsResource, c.ns, run), &v1alpha1.Run{})
+		Invokes(testing.NewUpdateActionWithOptions(runsResource, c.ns, run, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Run), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeRuns) UpdateStatus(ctx context.Context, run *v1alpha1.Run, opts v1.UpdateOptions) (*v1alpha1.Run, error) {
+func (c *FakeRuns) UpdateStatus(ctx context.Context, run *v1alpha1.Run, opts v1.UpdateOptions) (result *v1alpha1.Run, err error) {
+	emptyResult := &v1alpha1.Run{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(runsResource, "status", c.ns, run), &v1alpha1.Run{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(runsResource, "status", c.ns, run, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Run), err
 }
@@ -124,7 +128,7 @@ func (c *FakeRuns) Delete(ctx context.Context, name string, opts v1.DeleteOption
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeRuns) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(runsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(runsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.RunList{})
 	return err
@@ -132,11 +136,12 @@ func (c *FakeRuns) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, 
 
 // Patch applies the patch and returns the patched run.
 func (c *FakeRuns) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Run, err error) {
+	emptyResult := &v1alpha1.Run{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(runsResource, c.ns, name, pt, data, subresources...), &v1alpha1.Run{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(runsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Run), err
 }

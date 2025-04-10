@@ -106,8 +106,8 @@ func (ac *reconciler) Admit(ctx context.Context, request *admissionv1.AdmissionR
 func (ac *reconciler) decodeRequestAndPrepareContext(
 	ctx context.Context,
 	req *admissionv1.AdmissionRequest,
-	gvk schema.GroupVersionKind) (context.Context, resourcesemantics.GenericCRD, error) {
-
+	gvk schema.GroupVersionKind,
+) (context.Context, resourcesemantics.GenericCRD, error) {
 	logger := logging.FromContext(ctx)
 	handler, ok := ac.handlers[gvk]
 	if !ok {
@@ -160,7 +160,8 @@ func (ac *reconciler) decodeRequestAndPrepareContext(
 	return ctx, newObj, nil
 }
 
-func validate(ctx context.Context, resource resourcesemantics.GenericCRD, req *admissionv1.AdmissionRequest) (err error, warn []error) { //nolint
+//nolint:stylecheck
+func validate(ctx context.Context, resource resourcesemantics.GenericCRD, req *admissionv1.AdmissionRequest) (err error, warn []error) {
 	logger := logging.FromContext(ctx)
 
 	// Only run validation for supported create and update validation.
@@ -180,7 +181,7 @@ func validate(ctx context.Context, resource resourcesemantics.GenericCRD, req *a
 	}
 
 	if result := resource.Validate(ctx); result != nil {
-		logger.Errorw("Failed the resource specific validation", zap.Error(err))
+		logger.Infow("Failed the resource specific validation", zap.Error(result))
 		// While we have the strong typing of apis.FieldError, partition the
 		// returned error into the error-level diagnostics and warning-level
 		// diagnostics, so that the admission response can embed things into

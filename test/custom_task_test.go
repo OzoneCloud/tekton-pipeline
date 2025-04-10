@@ -20,10 +20,8 @@ limitations under the License.
 package test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -32,7 +30,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
@@ -42,7 +39,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	"knative.dev/pkg/apis"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 	knativetest "knative.dev/pkg/test"
@@ -115,7 +111,7 @@ spec:
         steps:
         - args: ['-c', 'echo $(input-result-from-custom-task-ref) $(input-result-from-custom-task-spec)']
           command: ['/bin/bash']
-          image: ubuntu
+          image: mirror.gcr.io/ubuntu
 `, pipelineRunName, betaAPIVersion, kind, betaAPIVersion, kind, customTaskRawSpec)),
 		metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create PipelineRun %q: %v", pipelineRunName, err)
@@ -155,9 +151,10 @@ spec:
 		// Simulate a Custom Task controller updating the CustomRun to done/successful.
 		cr.Status = v1beta1.CustomRunStatus{
 			Status: duckv1.Status{
-				Conditions: duckv1.Conditions{{
-					Type:   apis.ConditionSucceeded,
-					Status: corev1.ConditionTrue,
+				Conditions: []apis.Condition{{
+					Type:               apis.ConditionSucceeded,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: apis.VolatileTime{Inner: metav1.NewTime(time.Now())},
 				}},
 			},
 			CustomRunStatusFields: v1beta1.CustomRunStatusFields{
@@ -165,6 +162,10 @@ spec:
 					Name:  "runResult",
 					Value: "aResultValue",
 				}},
+				ExtraFields: runtime.RawExtension{
+					// Raw: customTaskRawSpec,
+					Raw: []byte(`{"blah":1,"blub":"value"}`),
+				},
 			},
 		}
 
@@ -335,11 +336,16 @@ spec:
 	cr.Status = v1beta1.CustomRunStatus{
 		CustomRunStatusFields: v1beta1.CustomRunStatusFields{
 			StartTime: &metav1.Time{Time: time.Now()},
+			ExtraFields: runtime.RawExtension{
+				// Raw: customTaskRawSpec,
+				Raw: []byte(`{"blah":1,"blub":"value"}`),
+			},
 		},
 		Status: duckv1.Status{
 			Conditions: []apis.Condition{{
-				Type:   apis.ConditionSucceeded,
-				Status: corev1.ConditionUnknown,
+				Type:               apis.ConditionSucceeded,
+				Status:             corev1.ConditionUnknown,
+				LastTransitionTime: apis.VolatileTime{Inner: metav1.NewTime(time.Now())},
 			}},
 		},
 	}
@@ -352,7 +358,7 @@ spec:
 		t.Errorf("Error waiting for PipelineRun %s to finish: %s", pipelineRun.Name, err)
 	}
 
-	customRunList, err := c.V1beta1CustomRunClient.List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("tekton.dev/pipelineRun=%s", pipelineRun.Name)})
+	customRunList, err := c.V1beta1CustomRunClient.List(ctx, metav1.ListOptions{LabelSelector: "tekton.dev/pipelineRun=" + pipelineRun.Name})
 	if err != nil {
 		t.Fatalf("Error listing Runs for PipelineRun %s: %s", pipelineRun.Name, err)
 	}
@@ -699,89 +705,9 @@ func TestWaitCustomTask_V1_PipelineRun(t *testing.T) {
 	}
 }
 
-// updateConfigMap updates the config map for specified @name with values. We can't use the one from knativetest because
-// it assumes that Data is already a non-nil map, and by default, it isn't!
-func updateConfigMap(ctx context.Context, client kubernetes.Interface, name string, configName string, values map[string]string) error {
-	configMap, err := client.CoreV1().ConfigMaps(name).Get(ctx, configName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if configMap.Data == nil {
-		configMap.Data = make(map[string]string)
-	}
-
-	for key, value := range values {
-		configMap.Data[key] = value
-	}
-
-	_, err = client.CoreV1().ConfigMaps(name).Update(ctx, configMap, metav1.UpdateOptions{})
-	return err
-}
-
 func resetConfigMap(ctx context.Context, t *testing.T, c *clients, namespace, configName string, values map[string]string) {
 	t.Helper()
 	if err := updateConfigMap(ctx, c.KubeClient, namespace, configName, values); err != nil {
 		t.Log(err)
 	}
-}
-
-func getFeatureFlagsBaseOnAPIFlag(t *testing.T) *config.FeatureFlags {
-	t.Helper()
-	alphaFeatureFlags, err := config.NewFeatureFlagsFromMap(map[string]string{
-		"enable-api-fields":            "alpha",
-		"results-from":                 "sidecar-logs",
-		"enable-tekton-oci-bundles":    "true",
-		"enable-step-actions":          "true",
-		"enable-cel-in-whenexpression": "true",
-		"enable-param-enum":            "true",
-	})
-	if err != nil {
-		t.Fatalf("error creating alpha feature flags configmap: %v", err)
-	}
-	betaFeatureFlags, err := config.NewFeatureFlagsFromMap(map[string]string{
-		"enable-api-fields": "beta",
-	})
-	if err != nil {
-		t.Fatalf("error creating beta feature flags configmap: %v", err)
-	}
-	stableFeatureFlags, err := config.NewFeatureFlagsFromMap(map[string]string{
-		"enable-api-fields": "stable",
-	})
-	if err != nil {
-		t.Fatalf("error creating stable feature flags configmap: %v", err)
-	}
-	enabledFeatureGate, err := getAPIFeatureGate()
-	if err != nil {
-		t.Fatalf("error reading enabled feature gate: %v", err)
-	}
-	switch enabledFeatureGate {
-	case "alpha":
-		return alphaFeatureFlags
-	case "beta":
-		return betaFeatureFlags
-	default:
-		return stableFeatureFlags
-	}
-}
-
-// getAPIFeatureGate queries the tekton pipelines namespace for the
-// current value of the "enable-api-fields" feature gate.
-func getAPIFeatureGate() (string, error) {
-	ns := os.Getenv("SYSTEM_NAMESPACE")
-	if ns == "" {
-		ns = "tekton-pipelines"
-	}
-
-	cmd := exec.Command("kubectl", "get", "configmap", "feature-flags", "-n", ns, "-o", `jsonpath="{.data['enable-api-fields']}"`)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("error getting feature-flags configmap: %w", err)
-	}
-	output = bytes.TrimSpace(output)
-	output = bytes.Trim(output, "\"")
-	if len(output) == 0 {
-		output = []byte("stable")
-	}
-	return string(output), nil
 }
