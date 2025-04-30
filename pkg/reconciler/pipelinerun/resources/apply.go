@@ -688,7 +688,7 @@ func runResultValue(taskName string, resultName string, runResults map[string][]
 
 // ApplyParametersToWorkspaceBindings applies parameters from PipelineSpec and  PipelineRun to the WorkspaceBindings in a PipelineRun. It replaces
 // placeholders in various binding types with values from provided parameters.
-func ApplyParametersToWorkspaceBindings(ctx context.Context, pr *v1.PipelineRun) {
-	parameters, _, _ := paramsFromPipelineRun(ctx, pr)
+func ApplyParametersToWorkspaceBindings(ctx context.Context,kubeClientSet kubernetes.Interface, pr *v1.PipelineRun) {
+	parameters, _, _ ,_:= paramsFromPipelineRun(ctx,kubeClientSet, pr)
 	pr.Spec.Workspaces = workspace.ReplaceWorkspaceBindingsVars(pr.Spec.Workspaces, parameters)
 }

@@ -1,6 +1,7 @@
 module github.com/OzoneCloud/tekton-pipeline
 
-go 1.22.7
+go 1.22.11
+
 toolchain go1.24.1
 
 require (
@@ -47,6 +48,7 @@ require (
 	github.com/sigstore/sigstore/pkg/signature/kms/azure v1.8.15
 	github.com/sigstore/sigstore/pkg/signature/kms/gcp v1.8.15
 	github.com/sigstore/sigstore/pkg/signature/kms/hashivault v1.8.15
+	github.com/tektoncd/pipeline v0.0.0-00010101000000-000000000000
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.34.0
 	go.opentelemetry.io/otel/sdk v1.34.0
@@ -146,6 +148,7 @@ require (
 replace (
 	github.com/aws/aws-sdk-go-v2/service/ecr => github.com/aws/aws-sdk-go-v2/service/ecr v1.27.3
 	github.com/aws/aws-sdk-go-v2/service/ecrpublic => github.com/aws/aws-sdk-go-v2/service/ecrpublic v1.23.3
+	github.com/tektoncd/pipeline => github.com/OzoneCloud/tekton-pipeline v0.0.0-20250410063854-39073123ea30
 )
 
 require (
